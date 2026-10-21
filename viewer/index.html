@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BAR-ATH Viewer</title>
+<link rel="icon" href="assets/barcelona.svg">
+<style>
+  :root {
+    --bg: #0f1216; --panel: #181c22; --panel2: #20252d; --line: #2c333d;
+    --text: #e8ecf1; --muted: #8b95a3; --accent: #3fb6ff;
+    --barca1: #a50044; --barca2: #004d98; --athletic: #ee2523; --dead: #3a3f47;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+    font: 13px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  button, select, input { font: inherit; color: var(--text); background: var(--panel2);
+    border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px; }
+  button { cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); color: #001522; border-color: var(--accent); font-weight: 600; }
+  input[type=color] { padding: 0; width: 28px; height: 22px; }
+  input[type=number] { width: 90px; }
+  label.file { display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
+    background: var(--panel2); border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px; }
+  label.file:hover { border-color: var(--accent); }
+  label.file input { display: none; }
+
+  .app { display: grid; height: 100vh; gap: 8px; padding: 8px;
+    grid-template-columns: minmax(0, 1fr) 300px;
+    grid-template-rows: auto auto minmax(0, 1fr) auto; }
+  header { grid-column: 1 / -1; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  header h1 { font-size: 15px; margin: 0 12px 0 0; }
+  header .status { color: var(--muted); margin-left: auto; }
+
+  /* ---- possession box ------------------------------------------------------------------- */
+  #possession { grid-column: 1 / -1; display: grid; grid-template-columns: auto 1fr auto; gap: 20px;
+    align-items: center; min-height: 128px; padding: 12px 24px; border-radius: 14px;
+    border: 3px solid transparent; transition: background .15s, color .15s; }
+  #possession .crest { width: 104px; height: 104px; object-fit: contain;
+    filter: drop-shadow(0 2px 6px rgba(0,0,0,.5)); }
+  #possession .crest.hidden { visibility: hidden; }
+  #possession .who { font-size: clamp(28px, 4.2vw, 56px); font-weight: 900; letter-spacing: .02em;
+    text-transform: uppercase; line-height: 1; }
+  #possession .sub { font-size: 15px; opacity: .85; margin-top: 6px; font-weight: 600; }
+  #possession[data-label=H] { background: linear-gradient(110deg, var(--barca1) 0 50%, var(--barca2) 50% 100%);
+    color: #fff; border-color: #edbb00; }
+  #possession[data-label=A] { color: #111;
+    background: repeating-linear-gradient(90deg, #fff 0 46px, var(--athletic) 46px 92px);
+    border-color: #111; }
+  #possession[data-label=A] .who, #possession[data-label=A] .sub { background: rgba(255,255,255,.92);
+    display: inline-block; padding: 2px 10px; border-radius: 6px; }
+  #possession[data-label=D] { background: var(--dead); color: #fff; border-color: #777; }
+  #possession[data-label=X] { color: var(--muted); border-color: var(--line);
+    background: repeating-linear-gradient(45deg, #1b1f25 0 12px, #15181d 12px 24px); }
+  .pred { background: rgba(0,0,0,.55); color: #fff; border-radius: 10px; padding: 8px 14px;
+    min-width: 230px; display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; align-items: center; }
+  .pred img { width: 40px; height: 40px; object-fit: contain; grid-row: span 2; }
+  .pred .lbl { font-size: 11px; text-transform: uppercase; opacity: .7; }
+  .pred .val { font-weight: 800; font-size: 18px; }
+  .pred .ok { color: #3ddc84; } .pred .bad { color: #ff5a5a; }
+  .pred .acc { grid-column: 1 / -1; font-size: 11px; opacity: .8; }
+
+  /* ---- views ---------------------------------------------------------------------------- */
+  .views { display: grid; gap: 8px; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); min-height: 0; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; overflow: hidden;
+    display: flex; flex-direction: column; min-height: 0; }
+  .card h2 { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted);
+    margin: 0; padding: 6px 10px; border-bottom: 1px solid var(--line); display: flex; gap: 10px; align-items: center; }
+  .card h2 .right { margin-left: auto; display: flex; gap: 10px; text-transform: none; letter-spacing: 0; }
+  .videobox { position: relative; flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; background: #000; }
+  .videoframe { position: relative; aspect-ratio: 16 / 9; max-width: 100%; max-height: 100%; width: 100%; }
+  .videoframe video, .videoframe canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .videoframe canvas { pointer-events: none; }
+  .novideo { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    color: var(--muted); text-align: center; padding: 20px; }
+  #pitch { flex: 1; width: 100%; min-height: 0; display: block; }
+  .tags { padding: 6px 10px; border-top: 1px solid var(--line); min-height: 30px; display: flex; gap: 6px; flex-wrap: wrap; }
+  .tag { background: var(--panel2); border-radius: 4px; padding: 1px 6px; font-size: 11px; }
+  .tag.H { border-left: 3px solid #1f6fd1; } .tag.A { border-left: 3px solid var(--athletic); }
+
+  /* ---- controls + timeline -------------------------------------------------------------- */
+  .bottom { grid-column: 1 / 2; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; }
+  .controls { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  .controls .clock { font-variant-numeric: tabular-nums; font-weight: 700; font-size: 15px; min-width: 230px; }
+  #scrub { width: 100%; margin: 8px 0 4px; }
+  #timeline { width: 100%; height: 70px; display: block; cursor: pointer; border-radius: 6px; }
+  .legend { display: flex; gap: 12px; color: var(--muted); font-size: 11px; margin-top: 4px; flex-wrap: wrap; }
+  .sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; vertical-align: -1px; margin-right: 3px; }
+
+  /* ---- layers sidebar ------------------------------------------------------------------- */
+  aside { grid-column: 2; grid-row: 3 / 5; background: var(--panel); border: 1px solid var(--line);
+    border-radius: 10px; overflow: auto; padding: 8px; display: flex; flex-direction: column; gap: 8px; }
+  aside h3 { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 4px 2px; }
+  .layer { background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 8px; display: grid; gap: 6px; }
+  .layer .title { display: flex; align-items: center; gap: 6px; font-weight: 700; }
+  .layer .title span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+  .layer .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .layer .row label { display: inline-flex; gap: 4px; align-items: center; }
+  .layer input[type=range] { width: 90px; }
+  .help { color: var(--muted); font-size: 11px; }
+  .help kbd { background: var(--panel2); border: 1px solid var(--line); border-radius: 3px; padding: 0 4px; font-size: 10px; }
+
+  @media (max-width: 1100px) {
+    .app { grid-template-columns: 1fr; height: auto; }
+    .views { grid-template-columns: 1fr; }
+    .videoframe { height: auto; }
+    #pitch { height: 320px; flex: none; }
+    aside { grid-column: 1; grid-row: auto; }
+    .bottom { grid-column: 1; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>⚽ BAR-ATH · Viewer de posse</h1>
+    <label class="file">🎬 Abrir vídeo<input type="file" id="videoFile" accept="video/*"></label>
+    <label class="file">➕ Adicionar tracking (CSV)<input type="file" id="trackFile" accept=".csv,text/csv" multiple></label>
+    <label class="file">🎯 Carregar predição (CSV)<input type="file" id="predFile" accept=".csv,text/csv"></label>
+    <select id="predBaseline" title="Baselines do repositório">
+      <option value="">— baseline do repo —</option>
+      <option>baseline_raw</option><option>baseline_smooth25</option>
+      <option>baseline_smooth50</option><option>baseline_smooth125</option>
+    </select>
+    <span class="status" id="status">carregando…</span>
+  </header>
+
+  <section id="possession" data-label="X">
+    <img class="crest" id="crest" alt="">
+    <div>
+      <div class="who" id="who">—</div>
+      <div class="sub" id="whoSub">Gabarito oficial</div>
+    </div>
+    <div class="pred" id="pred">
+      <img id="predCrest" alt="">
+      <div class="lbl">Nossa predição</div>
+      <div class="val" id="predVal">sem predição</div>
+      <div class="acc" id="predAcc"></div>
+    </div>
+  </section>
+
+  <div class="views">
+    <div class="card">
+      <h2>Vídeo tático
+        <span class="right">
+          <label><input type="checkbox" id="showLines"> linhas do campo</label>
+          <label><input type="checkbox" id="showOverlay" checked> overlay</label>
+        </span>
+      </h2>
+      <div class="videobox">
+        <div class="videoframe">
+          <video id="video" preload="auto" playsinline muted></video>
+          <canvas id="overlay"></canvas>
+          <div class="novideo" id="novideo">Sem vídeo. Use <b>&nbsp;🎬 Abrir vídeo&nbsp;</b> ou rode <code>&nbsp;python viewer/serve.py</code>.<br>O tracking e o mapa 2D funcionam mesmo sem vídeo.</div>
+        </div>
+      </div>
+      <div class="tags" id="tags"></div>
+    </div>
+    <div class="card">
+      <h2>Mapa tático 2D
+        <span class="right">
+          <label><input type="checkbox" id="flipX"> inverter X</label>
+          <label><input type="checkbox" id="flipY"> inverter Y</label>
+        </span>
+      </h2>
+      <canvas id="pitch"></canvas>
+    </div>
+  </div>
+
+  <aside>
+    <h3>Camadas de tracking</h3>
+    <div id="layers"></div>
+    <div class="help">
+      CSV extra: <code>frame,track_id,team,x,y</code> — <code>frame</code> = frame do vídeo (0-based),
+      <code>team</code> = H / A / B (bola), <code>x,y</code> normalizados 0–1 como o ATD.
+    </div>
+    <h3>Atalhos</h3>
+    <div class="help">
+      <kbd>Espaço</kbd> play/pause · <kbd>←</kbd><kbd>→</kbd> ±1 frame ·
+      <kbd>Shift</kbd>+setas ±1 s · <kbd>Ctrl</kbd>+setas ±10 s ·
+      <kbd>[</kbd><kbd>]</kbd> velocidade · <kbd>G</kbd> início do gabarito
+    </div>
+  </aside>
+
+  <div class="bottom">
+    <div class="controls">
+      <button id="play" class="primary">▶ Play</button>
+      <button data-step="-250">−10s</button>
+      <button data-step="-25">−1s</button>
+      <button data-step="-1">−1f</button>
+      <button data-step="1">+1f</button>
+      <button data-step="25">+1s</button>
+      <button data-step="250">+10s</button>
+      <select id="rate">
+        <option value="0.25">0.25×</option><option value="0.5">0.5×</option>
+        <option value="1" selected>1×</option><option value="2">2×</option><option value="4">4×</option>
+      </select>
+      <span class="clock" id="clock">frame 0</span>
+      <input type="number" id="gotoFrame" placeholder="frame">
+      <input type="text" id="gotoTime" placeholder="mm:ss" style="width:70px">
+      <button id="goGT">Início gabarito</button>
+      <button id="goH2">2º tempo</button>
+      <select id="range">
+        <option value="gt" selected>Timeline: janela do gabarito</option>
+        <option value="h1">Timeline: 1º tempo</option>
+        <option value="h2">Timeline: 2º tempo</option>
+        <option value="all">Timeline: vídeo inteiro</option>
+      </select>
+    </div>
+    <input type="range" id="scrub" min="0" max="199318" value="0">
+    <canvas id="timeline"></canvas>
+    <div class="legend">
+      <span><i class="sw" style="background:#1f6fd1"></i>Barcelona (H)</span>
+      <span><i class="sw" style="background:var(--athletic)"></i>Athletic (A)</span>
+      <span><i class="sw" style="background:#9aa3ad"></i>Bola morta (D)</span>
+      <span><i class="sw" style="background:#22272e"></i>sem rótulo (X)</span>
+      <span>linhas: gabarito · predição · erros · smart tagging</span>
+    </div>
+  </div>
+</div>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
