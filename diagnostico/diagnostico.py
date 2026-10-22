@@ -1,8 +1,8 @@
 """Diagnóstico do tracking (ATD): o que há nos dados e o time de cada slot é confiável?
  
-Coloque este arquivo em starter/ e rode (só numpy; reusa baseline.py e games.py):
+Rode a partir da raiz do repositório (só numpy; reusa starter/baseline.py e games.py):
  
-    python starter/tracking_diagnostics.py
+    python diagnostico/diagnostico.py
  
 Lê o atd.txt uma vez (~1-2 min) e guarda um cache em data/_cache/ (data/ é ignorado pelo git;
 não publique esse cache, é dado derivado do tracking). Imprime, só com o ATD e sem nenhum GT:
@@ -30,7 +30,7 @@ import numpy as np
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 sys.path.insert(0, ROOT)
-sys.path.insert(0, HERE)
+sys.path.insert(0, os.path.join(os.path.dirname(HERE), "starter"))  # baseline, load_homography
 from games import DATA_DIR, GAME, GAMES, half_video_blocks, require, source_frames  # noqa: E402
 import baseline  # noqa: E402  (reusa team_of_each_track)
  

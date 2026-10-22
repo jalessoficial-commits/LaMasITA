@@ -1,16 +1,16 @@
 """Assiste um trecho do vídeo tactical com o tracking (ATD) desenhado por cima.
 
-    python starter/assistir_slot.py 24                 # começa onde o slot 24 aparece pela 1ª vez
-    python starter/assistir_slot.py 24 30000           # 1º frame >= 30000 com o slot 24
-    python starter/assistir_slot.py 24 30000 60        # idem, por 60 segundos
-    python starter/assistir_slot.py 24 30000 60 --salvar   # grava um .mp4 em vez de abrir janela
-    python starter/assistir_slot.py 24 30000 10 --exato    # começa exatamente no frame 30000
+    python diagnostico/assistir_slot.py 24                 # começa onde o slot 24 aparece pela 1ª vez
+    python diagnostico/assistir_slot.py 24 30000           # 1º frame >= 30000 com o slot 24
+    python diagnostico/assistir_slot.py 24 30000 60        # idem, por 60 segundos
+    python diagnostico/assistir_slot.py 24 30000 60 --salvar   # grava um .mp4 em vez de abrir janela
+    python diagnostico/assistir_slot.py 24 30000 10 --exato    # começa exatamente no frame 30000
 
 Cores: casa vermelho, fora azul, bola branca, slot escolhido amarelo e maior. Todo slot leva o
 número ao lado; o topo mostra quantos slots de cada time estão presentes no frame.
 Teclas na janela: espaço pausa/continua, q sai.
 
-Precisa de: pip install opencv-python. Usa o cache do tracking_diagnostics.py
+Precisa de: pip install opencv-python. Usa o cache do diagnostico.py
 (data/_cache/atd_xy_v2.npz), então rode o diagnóstico antes. O .mp4 salvo vai para data/_cache/,
 que o git ignora: é vídeo recortado da partida, não pode ir para o repositório público.
 """
@@ -24,7 +24,7 @@ import numpy as np
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))
-sys.path.insert(0, HERE)
+sys.path.insert(0, os.path.join(os.path.dirname(HERE), "starter"))  # baseline, load_homography
 from games import DATA_DIR, asset_paths  # noqa: E402
 from load_homography import load as load_homography, project  # noqa: E402
 import baseline  # noqa: E402

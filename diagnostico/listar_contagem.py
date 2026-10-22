@@ -1,11 +1,11 @@
 """Lista os trechos (frames graduados) em que um time tem slots demais ou de menos.
 
-    python starter/listar_contagem.py casa --min 12      # casa com 12 ou mais slots
-    python starter/listar_contagem.py fora --min 12
-    python starter/listar_contagem.py casa --max 2       # casa com 2 ou menos slots
+    python diagnostico/listar_contagem.py casa --min 12      # casa com 12 ou mais slots
+    python diagnostico/listar_contagem.py fora --min 12
+    python diagnostico/listar_contagem.py casa --max 2       # casa com 2 ou menos slots
 
 Imprime os trechos mais longos com os slots presentes no início de cada um. O início de um trecho
-vai direto no assistir_slot.py com --exato. Usa o cache do tracking_diagnostics.py.
+vai direto no assistir_slot.py com --exato. Usa o cache do diagnostico.py.
 """
 
 import argparse
@@ -16,7 +16,7 @@ import numpy as np
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))
-sys.path.insert(0, HERE)
+sys.path.insert(0, os.path.join(os.path.dirname(HERE), "starter"))  # baseline, load_homography
 from games import DATA_DIR, GAME, GAMES, asset_paths, half_video_blocks  # noqa: E402
 import baseline  # noqa: E402
 
