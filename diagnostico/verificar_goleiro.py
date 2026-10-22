@@ -1,6 +1,6 @@
 """Quais slots se comportam como goleiro? Sem vídeo, só pelo comportamento no tracking.
 
-    python starter/verificar_goleiros.py
+    python diagnostico/verificar_goleiro.py
 
 Para cada slot, nos frames graduados em que está presente:
   - % do tempo em que é o jogador MAIS RECUADO do próprio time (mais perto do próprio gol)
@@ -11,7 +11,7 @@ Um goleiro fica perto de 100% na primeira coluna. Que lado cada time defende em 
 decidido no frame do kickoff de cada tempo, quando todos estão no próprio campo -- mais robusto
 que a média do tempo inteiro, que ficou perto demais de 0.5 no diagnóstico.
 
-Usa o cache do tracking_diagnostics.py.
+Usa o cache do diagnostico.py.
 """
 
 import os
@@ -21,7 +21,7 @@ import numpy as np
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))
-sys.path.insert(0, HERE)
+sys.path.insert(0, os.path.join(os.path.dirname(HERE), "starter"))  # baseline, load_homography
 from games import DATA_DIR, GAME, GAMES, asset_paths, half_video_blocks  # noqa: E402
 import baseline  # noqa: E402
 
