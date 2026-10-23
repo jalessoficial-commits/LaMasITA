@@ -35,6 +35,8 @@ data/*
 *.mp4
 *.gzip
 *.pl3container
+*.pt
+tracking_bola/out
 
 # -- internal documents ---------------------------------------------------------------------------
 # OVERVIEW.md -- the institutional description of the competition -- IS committed. It is the only
