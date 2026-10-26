@@ -7,6 +7,11 @@ opencv-python (a versão com janela, não a "headless"):
     python tracking_bola/annotate_ball.py                 # 300 frames, retoma de onde parou
     python tracking_bola/annotate_ball.py --n 500 --seed 0
 
+Conjunto de TESTE separado (frames 301 a 400 da mesma lista, garantidamente diferentes dos 300 primeiros),
+num arquivo próprio, para medir o modelo final em frames que não foram usados para escolher nada:
+
+    python tracking_bola/annotate_ball.py --start 300 --n 400 --out tracking_bola/out/annotations/ball_annotations_teste.csv
+
 Para que serve: não existe gabarito de posição da bola (o GT público só tem posse, e o ATD é o que
 estamos medindo). Os cliques viram esse gabarito, usado só para VALIDAR (e, se quiser, treinar)
 modelos. O arquivo submetido continua saindo de um algoritmo, como o RULES.md exige.
@@ -227,6 +232,8 @@ def annotate_frame(images, title, view_scale, state):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--n", type=int, default=300, help="quantos frames na lista (padrão 300)")
+    parser.add_argument("--start", type=int, default=0,
+                        help="começa na posição N da lista (padrão 0). Ex.: --start 300 --n 400 = os 100 frames seguintes")
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--min-gap", type=int, default=125, help="distância mínima entre frames, em frames")
     parser.add_argument("--view-width", type=int, default=1400, help="largura da tela inteira, em pixels")
@@ -237,7 +244,9 @@ def main(argv=None):
         sys.exit("opencv não está instalado:  pip install opencv-python")
 
     n_frames = source_frames("tactical", GAME)
-    order = sample_frames(n_frames, args.min_gap, args.seed)[:args.n]
+    if not 0 <= args.start < args.n:
+        sys.exit("--start deve estar entre 0 e --n - 1")
+    order = sample_frames(n_frames, args.min_gap, args.seed)[args.start:args.n]
     rows = read_annotations(args.out)
     done = {int(row["frame"]) for row in rows}
 
