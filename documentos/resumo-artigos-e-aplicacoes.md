@@ -27,6 +27,21 @@ Dos 14 candidatos encontrados fora dos cinco artigos, estes quatro são os que m
 | Dados abertos da Sportec (7 jogos) | Os arquivos de posição da liga alemã trazem, segundo a documentação do floodlight, códigos de posse e de bola em jogo por frame. | Treinar e validar fora dos 5 minutos públicos, com rótulos da mesma natureza do ground truth, se os códigos estiverem presentes. |
 | [WASB](https://arxiv.org/pdf/2311.05237) | Detector de bola em vídeo que olha 3 frames seguidos. Teve F1 de 88,3% em vídeo de futebol de câmeras fixas. | Recuperar a bola no vídeo tático nos frames em que o tracking a perdeu, usando a homografia para converter a posição para o campo. |
 
+## Código e modelos treinados disponíveis
+
+Só dois modelos já vêm com pesos treinados, prontos para rodar: o PathCRF e o WASB. Os outros precisam ser treinados do zero ou são regras que não dependem de treino. Mesmo os pesos prontos foram treinados em outros dados (tracking da liga alemã, no PathCRF, e outro vídeo de futebol, no WASB), então provavelmente vão precisar de ajuste para o desafio.
+
+| Artigo ou modelo | Código | Modelo treinado (pesos) | Licença |
+| --- | --- | --- | --- |
+| Borghesi et al. (2023) | Não publicado | Não publicado | Não se aplica |
+| Vidal-Codina et al. (2022) | Não publicado; a biblioteca DataBallPy implementa a parte de posse | Não precisa, porque o método usa regras fixas | Não se aplica |
+| Kim et al. (2023), ballradar | [Publicado](https://github.com/pientist/ballradar), com código de treino e de avaliação | Não publicado; é preciso treinar | Nenhuma licença visível |
+| Link & Hoernig (2017) | Não publicado; só há um arquivo de exemplo de dados | Não publicado | Não se aplica |
+| ELASTIC (2025) | [Publicado](https://github.com/hyunsungkim-ds/elastic) | Não precisa, porque o método usa sinais de movimento e um alinhamento de sequências, sem treino | MPL-2.0 |
+| PathCRF (KDD 2026) | [Publicado](https://github.com/hyunsungkim-ds/pathcrf) | **Publicado**: cinco modelos treinados nos dados abertos da Sportec já estão no repositório | MPL-2.0 |
+| ASRF | [Publicado](https://github.com/yiskw713/asrf) | Não publicado; o repositório só indica onde baixar os dados de treino | MIT |
+| WASB | [Publicado](https://github.com/nttcom/WASB-SBDT) | **Publicado**: pesos treinados para futebol, listados no arquivo MODEL_ZOO do repositório | MIT |
+
 ## Como os métodos se combinam
 
 Os métodos funcionam como etapas de um mesmo sistema. Esta combinação é proposta minha e ainda não foi testada nos dados do desafio.
