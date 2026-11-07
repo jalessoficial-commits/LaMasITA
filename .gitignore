@@ -69,3 +69,4 @@ env/
 .DS_Store
 
 viewer/data/
+analise/out/

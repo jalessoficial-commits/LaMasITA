@@ -84,7 +84,7 @@
   .controls { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
   .controls .clock { font-variant-numeric: tabular-nums; font-weight: 700; font-size: 15px; min-width: 230px; }
   #scrub { width: 100%; margin: 8px 0 4px; }
-  #timeline { width: 100%; height: 70px; display: block; cursor: pointer; border-radius: 6px; }
+  #timeline { width: 100%; height: 98px; display: block; cursor: pointer; border-radius: 6px; }
   .legend { display: flex; gap: 12px; color: var(--muted); font-size: 11px; margin-top: 4px; flex-wrap: wrap; }
   .sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; vertical-align: -1px; margin-right: 3px; }
 
@@ -99,6 +99,17 @@
   .layer .row label { display: inline-flex; gap: 4px; align-items: center; }
   .layer input[type=range] { width: 90px; }
   .help { color: var(--muted); font-size: 11px; }
+  .rotlist { max-height: 170px; overflow: auto; display: grid; gap: 1px; }
+  .rotlist.small { max-height: 120px; }
+  .rotitem { display: flex; gap: 8px; align-items: center; padding: 2px 6px; border-radius: 4px; cursor: pointer;
+    font-size: 12px; font-variant-numeric: tabular-nums; }
+  .rotitem:hover { background: #262d36; }
+  .rotitem.sel { background: #23384d; outline: 1px solid var(--accent); }
+  .rotitem .st { margin-left: auto; }
+  .rotitem .st.ok { color: #3ddc84; } .rotitem .st.viva { color: var(--muted); } .rotitem .st.meio { color: #ffb74d; }
+  .rotitem button { padding: 0 5px; }
+  #rotCur { display: grid; gap: 4px; }
+  #rotCur input[type=number] { width: 90px; }
   .help kbd { background: var(--panel2); border: 1px solid var(--line); border-radius: 3px; padding: 0 4px; font-size: 10px; }
 
   @media (max-width: 1100px) {
@@ -175,11 +186,31 @@
       CSV extra: <code>frame,track_id,team,x,y</code> — <code>frame</code> = frame do vídeo (0-based),
       <code>team</code> = H / A / B (bola), <code>x,y</code> normalizados 0–1 como o ATD.
     </div>
+    <h3>Rotular</h3>
+    <div class="layer">
+      <div class="row"><label><input type="checkbox" id="rotKeys" checked> atalhos de rotulação</label></div>
+      <div class="help" id="rotProgress"></div>
+      <div class="rotlist" id="rotList"></div>
+      <div id="rotCur"></div>
+      <div class="row">
+        <button id="rotNew" title="nova parada começando no frame atual (P)">+ parada aqui</button>
+        <button id="rotDownload" title="baixar os dois CSVs">⬇ CSV</button>
+      </div>
+      <div class="row">
+        <button id="rotH" title="troca de posse para o Barcelona no frame atual (H)">posse H</button>
+        <button id="rotA" title="troca de posse para o Athletic no frame atual (A)">posse A</button>
+      </div>
+      <div class="rotlist small" id="rotPosse"></div>
+      <div class="help" id="rotSave"></div>
+    </div>
     <h3>Atalhos</h3>
     <div class="help">
       <kbd>Espaço</kbd> play/pause · <kbd>←</kbd><kbd>→</kbd> ±1 frame ·
       <kbd>Shift</kbd>+setas ±1 s · <kbd>Ctrl</kbd>+setas ±10 s ·
-      <kbd>[</kbd><kbd>]</kbd> velocidade · <kbd>G</kbd> início do gabarito
+      <kbd>[</kbd><kbd>]</kbd> velocidade · <kbd>G</kbd> início do gabarito ·
+      <kbd>N</kbd> / <kbd>Shift</kbd>+<kbd>N</kbd> próxima / anterior parada ou apito<br>
+      rotular: <kbd>I</kbd> início · <kbd>F</kbd> fim · <kbd>V</kbd> viva · <kbd>⏎</kbd> próxima ·
+      <kbd>P</kbd> parada nova · <kbd>H</kbd> / <kbd>A</kbd> troca de posse
     </div>
   </aside>
 
@@ -215,7 +246,7 @@
       <span><i class="sw" style="background:var(--athletic)"></i>Athletic (A)</span>
       <span><i class="sw" style="background:#9aa3ad"></i>Bola morta (D)</span>
       <span><i class="sw" style="background:#22272e"></i>sem rótulo (X)</span>
-      <span>linhas: gabarito · predição · erros · smart tagging</span>
+      <span>linhas: gabarito · predição · erros · smart tagging · paradas · <i class="sw" style="background:#3ddc84"></i>rótulos manuais</span>
     </div>
   </div>
 </div>

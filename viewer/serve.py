@@ -5,16 +5,19 @@
 
 The repository root is served as-is (so the viewer can read evaluation/gt and evaluation/results),
 and the first .mp4 in <data-dir>/tactical is exposed as /video/tactical.mp4, whatever its name.
+/api/rotulos reads and writes the hand labels of the "Rotular" panel (analise/out/rotulos_*.csv).
 Python's built-in http.server has no Range support, and without it a browser cannot seek a video.
 """
 
 import argparse
 import glob
 import http.server
+import json
 import os
 import re
 import shutil
 import sys
+import urllib.parse
 import webbrowser
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -25,6 +28,14 @@ from games import DATA_DIR  # noqa: E402
 # Params
 CHUNK = 1 << 20
 VIDEO_ROUTE = "/video/tactical.mp4"
+# Hand labels made in the viewer: GET/POST /api/rotulos?arquivo=<name>, only these files and headers.
+LABEL_ROUTE = "/api/rotulos"
+LABEL_DIR = os.path.join(ROOT, "analise", "out")
+LABEL_FILES = {
+    "rotulos_manuais": "id,categoria,frame_ref,tempo_video,previsto_inicio,previsto_fim,info,inicio_real,fim_real,obs",
+    "rotulos_posse": "frame,time,obs",
+}
+MAX_LABEL_BYTES = 5 << 20
 
 
 def find_video(data_dir):
@@ -88,6 +99,62 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             pass                              # the browser cancelled a range after a seek
         finally:
             self._remaining = None
+
+    # ---- hand labels (viewer/js/rotulos.js) -------------------------------------------------------
+    def _label_target(self):
+        parsed = urllib.parse.urlparse(self.path)
+        if parsed.path != LABEL_ROUTE:
+            return None
+        name = urllib.parse.parse_qs(parsed.query).get("arquivo", [""])[0]
+        if name not in LABEL_FILES:
+            self.send_error(400, "arquivo desconhecido: {!r}".format(name))
+            return False
+        return name, os.path.join(LABEL_DIR, name + ".csv")
+
+    def _send_text(self, code, text, content_type="text/csv; charset=utf-8"):
+        body = text.encode("utf-8")
+        self.send_response(code)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def do_GET(self):
+        target = self._label_target()
+        if target is None:
+            return super().do_GET()
+        if target is False:
+            return
+        name, path = target
+        if os.path.exists(path):
+            with open(path, encoding="utf-8-sig") as handle:
+                return self._send_text(200, handle.read())
+        if name == "rotulos_posse":                     # starts empty
+            return self._send_text(200, LABEL_FILES[name] + "\n")
+        self.send_error(404, "rode antes: python analise/rotular_paradas.py")
+
+    def do_POST(self):
+        target = self._label_target()
+        if not target:
+            if target is None:
+                self.send_error(404)
+            return
+        name, path = target
+        size = int(self.headers.get("Content-Length") or 0)
+        if size > MAX_LABEL_BYTES:
+            return self.send_error(413)
+        text = self.rfile.read(size).decode("utf-8").lstrip("﻿").replace("\r\n", "\n")
+        if text.split("\n", 1)[0].strip() != LABEL_FILES[name]:
+            return self.send_error(400, "cabeçalho inesperado para " + name)
+        os.makedirs(LABEL_DIR, exist_ok=True)
+        if os.path.exists(path):
+            shutil.copy2(path, path + ".bak")           # the previous version, one step back
+        tmp = path + ".tmp"
+        with open(tmp, "w", encoding="utf-8", newline="\n") as handle:
+            handle.write(text if text.endswith("\n") else text + "\n")
+        os.replace(tmp, path)
+        lines = sum(1 for line in text.split("\n")[1:] if line.strip())
+        self._send_text(200, json.dumps({"ok": True, "linhas": lines}), "application/json")
 
     def end_headers(self):
         self.send_header("Accept-Ranges", "bytes")
