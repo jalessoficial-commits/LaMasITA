@@ -3,7 +3,7 @@ import {
 } from "./loaders.js";
 import { Pitch } from "./pitch.js";
 import { Overlay } from "./overlay.js";
-import { initRotulos, rotulosKey, drawRotulos } from "./rotulos.js";
+import { initRotulos, rotulosKey, drawRotulos, rotulosFrame, rotulosRange } from "./rotulos.js";
 
 const GT_URL = "../evaluation/gt/BAR-ATH_possession_gt_public.csv";
 const RESULTS_URL = "../evaluation/results/";
@@ -75,6 +75,8 @@ async function init() {
   initRotulos({
     getFrame: () => state.frame, setFrame: (f) => { if (state.playing) pause(); setFrame(f); }, fps: state.fps,
     redraw: () => { drawTimelineBase(); drawTimeline(); }, setStatus,
+    pause, isPlaying: () => state.playing,
+    showBlock: () => { state.range = "bloco"; $("range").value = "bloco"; drawTimelineBase(); drawTimeline(); },
   });
 }
 
@@ -207,6 +209,7 @@ function viewRange() {
     case "h1": return [h1[1], h1[2]];
     case "h2": return [h2[1], h2[2]];
     case "all": return [0, state.nFrames - 1];
+    case "bloco": return rotulosRange() || GT_WINDOW;
     default: return GT_WINDOW;
   }
 }
@@ -316,7 +319,13 @@ function play() {
   $("play").textContent = "⏸ Pause";
   if (state.hasVideo) {
     video.playbackRate = state.rate;
-    video.play();
+    video.play().catch((err) => {
+      if (err.name !== "NotAllowedError" || video.muted) return;
+      video.muted = true;                    // the browser refused sound without a click: play muted
+      updateSoundUI();
+      setStatus("som bloqueado pelo navegador: clique em 🔇 para ligar");
+      video.play().catch(() => {});
+    });
   } else {
     let last = performance.now();
     let acc = 0;
@@ -345,6 +354,33 @@ function onVideoFrame(_now, metadata) {
   const f = Math.round(metadata.mediaTime * state.fps);
   if (f !== state.frame) setFrame(f, true);
   video.requestVideoFrameCallback(onVideoFrame);
+}
+
+// ---- sound: on by default, the choice is remembered per browser ---------------------------------
+
+function loadSoundPrefs() {
+  let prefs = { muted: false, volume: 0.8 };
+  try { prefs = { ...prefs, ...JSON.parse(localStorage.getItem("viewer_som") || "{}") }; } catch { /* default */ }
+  video.muted = prefs.muted;
+  video.volume = Math.min(1, Math.max(0, prefs.volume));
+  updateSoundUI();
+}
+
+function saveSoundPrefs() {
+  try { localStorage.setItem("viewer_som", JSON.stringify({ muted: video.muted, volume: video.volume })); } catch { /* ignore */ }
+}
+
+function updateSoundUI() {
+  const off = video.muted || video.volume === 0;
+  $("mute").textContent = off ? "🔇" : "🔊";
+  $("volume").value = video.volume;
+}
+
+function toggleSound() {
+  video.muted = !video.muted;
+  if (!video.muted && video.volume === 0) video.volume = 0.8;
+  updateSoundUI();
+  saveSoundPrefs();
 }
 
 function attachVideo(src, label) {
@@ -405,6 +441,7 @@ function render() {
   overlay.draw(f, $("showOverlay").checked ? layers : [], $("showLines").checked);
   renderPossession();
   drawTimeline();
+  rotulosFrame(f);
   $("scrub").value = f;
   $("clock").textContent = `frame ${f} · ${fmtTime(f / state.fps)} · ${matchClock(f)}`;
   const active = state.tags.filter((t) => t.start_frame <= f && f < t.end_frame);
@@ -504,6 +541,15 @@ function bindUI() {
     }
   };
 
+  loadSoundPrefs();
+  $("mute").onclick = toggleSound;
+  $("volume").oninput = (e) => {
+    video.volume = +e.target.value;
+    video.muted = video.volume === 0;
+    updateSoundUI();
+    saveSoundPrefs();
+  };
+
   window.addEventListener("resize", onResize);
   window.addEventListener("keydown", (e) => {
     if (e.target.matches("input[type=text], input[type=number], select")) return;
@@ -513,6 +559,7 @@ function bindUI() {
     else if (e.key === "ArrowRight") { e.preventDefault(); step(big); }
     else if (e.key === "ArrowLeft") { e.preventDefault(); step(-big); }
     else if (e.key === "g" || e.key === "G") setFrame(GT_WINDOW[0]);
+    else if (e.key === "m" || e.key === "M") toggleSound();
     else if (e.key === "n" || e.key === "N") jumpToEvent(e.shiftKey ? -1 : 1);
     else if (e.key === "[" || e.key === "]") {
       const sel = $("rate");

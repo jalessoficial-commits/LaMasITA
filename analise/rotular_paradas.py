@@ -108,13 +108,40 @@ def carregar(path=OUT):
 OUT_POSSE = os.path.join(HERE, "out", "rotulos_posse.csv")
 
 
+OUT_BLOCOS = os.path.join(HERE, "out", "rotulos_blocos.csv")
+
+
 def carregar_posse(path=OUT_POSSE):
-    """Trocas de posse marcadas no viewer (teclas H / A): frame, time ('H' | 'A'), obs; em ordem."""
+    """Marcas de posse do viewer (teclas H / A / D): frame, time ('H' | 'A' | 'D'), obs; em ordem.
+    Cada marca vale do seu frame até a próxima."""
     if not os.path.exists(path):
         return pd.DataFrame(columns=["frame", "time", "obs"])
     df = pd.read_csv(path, dtype={"time": str, "obs": str}).fillna({"obs": ""})
-    df = df[df.time.isin(["H", "A"])]
+    df = df[df.time.isin(["H", "A", "D"])]
     return df.astype({"frame": int}).sort_values("frame").reset_index(drop=True)
+
+
+def carregar_blocos(path=OUT_BLOCOS):
+    """Blocos de posse rotulados por completo no viewer: bloco, inicio, fim (frames), obs."""
+    if not os.path.exists(path):
+        return pd.DataFrame(columns=["bloco", "inicio", "fim", "obs"])
+    df = pd.read_csv(path, dtype={"obs": str}).fillna({"obs": ""})
+    return df.astype({"inicio": int, "fim": int}).sort_values("inicio").reset_index(drop=True)
+
+
+def gt_blocos(n_frames, posse=None, blocos=None):
+    """Gabarito dos blocos no formato oficial: um rótulo H/A/D por frame dentro dos blocos e 'X' fora.
+    Dentro de um bloco cada frame tem o rótulo da última marca até ele; antes da primeira marca, 'X'.
+    Serve para pontuar com evaluation/possession_metrics como se fosse o GT (gt=gt_blocos(N))."""
+    posse = carregar_posse() if posse is None else posse
+    blocos = carregar_blocos() if blocos is None else blocos
+    out = np.full(n_frames, "X", dtype="<U1")
+    for b in blocos.itertuples():
+        m = posse[(posse.frame >= b.inicio) & (posse.frame <= b.fim)]
+        for k, r in enumerate(m.itertuples()):
+            fim = m.frame.iloc[k + 1] if k + 1 < len(m) else b.fim + 1
+            out[r.frame:min(fim, n_frames)] = r.time
+    return out
 
 
 def avaliar(df, dead):

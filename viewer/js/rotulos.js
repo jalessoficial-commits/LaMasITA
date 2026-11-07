@@ -3,20 +3,28 @@
 // Read and written through serve.py (/api/rotulos); a draft stays in localStorage if a save fails.
 //
 // Keys (when "atalhos de rotulação" is on): I start · F end · V "viva" · P new stoppage here ·
-// H / A possession change to that team · Enter next unlabelled row.
+// Enter next unlabelled row · H / A / D possession from this frame (Barcelona, Athletic, dead ball) ·
+// Z undo the last possession mark.
 // The queue is blind on purpose: only id and time are shown, never the category or the prediction.
+//
+// Possession blocks (rotulos_blocos.csv): a stretch [inicio, fim] labelled completely, mark by mark.
+// Inside a block every frame takes the label of the last mark at or before it, so a block is a small
+// ground truth in the official format (analise/rotular_paradas.gt_blocos). Playback stops at its end.
 
 const API = "../api/rotulos?arquivo=";
 const FILES = {
   manuais: { name: "rotulos_manuais",
     cols: ["id", "categoria", "frame_ref", "tempo_video", "previsto_inicio", "previsto_fim", "info", "inicio_real", "fim_real", "obs"] },
   posse: { name: "rotulos_posse", cols: ["frame", "time", "obs"] },
+  blocos: { name: "rotulos_blocos", cols: ["bloco", "inicio", "fim", "obs"] },
 };
-const TEAM_COLOR = { H: "#1f6fd1", A: "#ee2523" };
+const TEAM_COLOR = { H: "#1f6fd1", A: "#ee2523", D: "#9aa3ad" };
 const DONE_COLOR = "#3ddc84";
+const BLOCK_S = 300;                 // a new block is 5 min long until its end is moved
 
-const lab = { manuais: [], posse: [], sel: -1, ok: { manuais: false, posse: false }, keys: true };
-let api = null;                      // {getFrame, setFrame, fps, redraw, setStatus}
+const lab = { manuais: [], posse: [], blocos: [], sel: -1, bloco: -1, hist: [],
+  ok: { manuais: false, posse: false, blocos: false }, keys: true };
+let api = null;                      // {getFrame, setFrame, fps, redraw, setStatus, pause, isPlaying, showBlock}
 const timers = {};
 const $ = (id) => document.getElementById(id);
 
@@ -166,10 +174,70 @@ function next() {
 function possession(team) {
   const f = api.getFrame();
   const i = lab.posse.findIndex((p) => num(p.frame) === f);
+  lab.hist.push({ frame: String(f), before: i >= 0 ? lab.posse[i].time : null });
   if (i >= 0) lab.posse[i].time = team;
   else lab.posse.push({ frame: String(f), time: team, obs: "" });
   lab.posse.sort((a, b) => num(a.frame) - num(b.frame));
   changed("posse");
+}
+
+function undo() {
+  const h = lab.hist.pop();
+  if (!h) return api.setStatus("posse: nada para desfazer");
+  if (h.before) lab.posse.find((p) => p.frame === h.frame).time = h.before;
+  else lab.posse = lab.posse.filter((p) => p.frame !== h.frame);
+  api.setFrame(num(h.frame));
+  changed("posse");
+}
+
+// ---- possession blocks -------------------------------------------------------------------------
+
+const activeBlock = () => lab.blocos[lab.bloco];
+
+function blockMarks(b) {
+  const a = num(b.inicio), e = num(b.fim);
+  return lab.posse.filter((p) => num(p.frame) >= a && num(p.frame) <= e);
+}
+
+function newBlock() {
+  const f = api.getFrame();
+  const id = Math.max(0, ...lab.blocos.map((b) => num(b.bloco) || 0)) + 1;
+  lab.blocos.push({ bloco: String(id), inicio: String(f), fim: String(f + BLOCK_S * api.fps), obs: "" });
+  lab.blocos.sort((a, b) => num(a.inicio) - num(b.inicio));
+  lab.bloco = lab.blocos.findIndex((b) => b.bloco === String(id));
+  api.showBlock();
+  changed("blocos");
+  api.setStatus("bloco novo: marque já quem tem a bola (H / A / D) e dê play");
+}
+
+function setBlockEdge(edge) {
+  const b = activeBlock();
+  if (!b) return api.setStatus("posse: crie ou escolha um bloco");
+  const f = api.getFrame();
+  if (edge === "inicio" ? f >= num(b.fim) : f <= num(b.inicio)) return api.setStatus("posse: o início precisa vir antes do fim");
+  b[edge] = String(f);
+  lab.blocos.sort((x, y) => num(x.inicio) - num(y.inicio));
+  lab.bloco = lab.blocos.indexOf(b);
+  api.showBlock();
+  changed("blocos");
+}
+
+function selectBlock(i) {
+  lab.bloco = i;
+  const b = activeBlock();
+  if (b) api.setFrame(num(b.inicio));
+  api.showBlock();
+  render();
+  api.redraw();
+}
+
+function blockStatus(b, f) {
+  const a = num(b.inicio), e = num(b.fim);
+  const marks = blockMarks(b);
+  const first = marks.length && num(marks[0].frame) <= a + api.fps;
+  const pct = Math.round(100 * Math.min(1, Math.max(0, (f - a) / Math.max(1, e - a))));
+  return { marks, first, pct, text: `bloco ${b.bloco} · ${mmss(a)}–${mmss(e)} · ${pct}% · ${marks.length} marcas`
+    + (first ? "" : " · ⚠ marque quem tem a bola no início") };
 }
 
 // ---- panel -----------------------------------------------------------------------------------
@@ -201,7 +269,19 @@ function render() {
       <button data-a="viva" title="não houve parada (V)">viva</button><button data-a="limpar">limpar</button></div>
     <div class="row"><button data-a="ref">ir à referência</button><button data-a="proxima" class="primary">próxima ⏎</button></div>`;
 
-  $("rotPosse").innerHTML = lab.posse.slice().reverse().map((p) => `
+  $("rotBlocos").innerHTML = lab.blocos.map((b, i) => {
+    const s = blockStatus(b, i === lab.bloco ? api.getFrame() : num(b.inicio));
+    return `<div class="rotitem ${i === lab.bloco ? "sel" : ""}" data-b="${i}">
+      <span>#${b.bloco}</span><span>${mmss(num(b.inicio))}–${mmss(num(b.fim))}</span>
+      <span class="help">${s.marks.length} marcas</span>
+      <span class="st ${s.first ? "ok" : "meio"}">${s.first ? "✓" : "⚠"}</span>
+      <button data-bdel="${i}" title="apagar o bloco (as marcas ficam)">✕</button></div>`;
+  }).join("") || '<div class="help">nenhum bloco: vá ao início do trecho e clique em "novo bloco aqui"</div>';
+  const b = activeBlock();
+  $("rotBlocoStatus").textContent = b ? blockStatus(b, api.getFrame()).text : "";
+
+  const shown = b ? blockMarks(b) : lab.posse;
+  $("rotPosse").innerHTML = shown.slice().reverse().map((p) => `
     <div class="rotitem" data-f="${p.frame}"><i class="sw" style="background:${TEAM_COLOR[p.time] || "#888"}"></i>
       <span>${mmss(num(p.frame))}</span><span>${p.time}</span><span class="help">${p.frame}</span>
       <button class="st" data-del="${p.frame}" title="apagar">✕</button></div>`).join("");
@@ -241,8 +321,23 @@ function bind() {
   $("rotNew").onclick = newStoppage;
   $("rotH").onclick = () => possession("H");
   $("rotA").onclick = () => possession("A");
+  $("rotD").onclick = () => possession("D");
+  $("rotUndo").onclick = undo;
+  $("rotBlocoNovo").onclick = newBlock;
+  $("rotBlocoIni").onclick = () => setBlockEdge("inicio");
+  $("rotBlocoFim").onclick = () => setBlockEdge("fim");
+  $("rotBlocoIr").onclick = () => { const b = activeBlock(); if (b) api.setFrame(num(b.inicio)); };
+  $("rotBlocos").onclick = (e) => {
+    if (e.target.dataset.bdel !== undefined) {
+      lab.blocos.splice(+e.target.dataset.bdel, 1);
+      lab.bloco = -1;
+      return changed("blocos");
+    }
+    const it = e.target.closest(".rotitem");
+    if (it) selectBlock(+it.dataset.b);
+  };
   $("rotDownload").onclick = () => {
-    for (const kind of ["manuais", "posse"]) {
+    for (const kind of ["manuais", "posse", "blocos"]) {
       const a = document.createElement("a");
       a.href = URL.createObjectURL(new Blob([toCSV(FILES[kind].cols, lab[kind])], { type: "text/csv" }));
       a.download = FILES[kind].name + ".csv";
@@ -263,10 +358,31 @@ function bind() {
 export async function initRotulos(hooks) {
   api = hooks;
   bind();
-  await Promise.all([load("manuais"), load("posse")]);
+  await Promise.all([load("manuais"), load("posse"), load("blocos")]);
   if (lab.manuais.length) lab.sel = Math.max(0, lab.manuais.findIndex((r) => !status(r)));
   render();
   api.redraw();
+}
+
+// called on every frame: progress of the active block, and playback stops at its end
+let lastPct = -1;
+export function rotulosFrame(f) {
+  const b = activeBlock();
+  if (!b || !api) return;
+  if (api.isPlaying() && f >= num(b.fim)) {
+    api.pause();
+    api.setStatus(`fim do bloco ${b.bloco}: confira as marcas ou crie o próximo bloco`);
+  }
+  const s = blockStatus(b, f);
+  if (s.pct !== lastPct) { lastPct = s.pct; $("rotBlocoStatus").textContent = s.text; }
+}
+
+// [inicio, fim] of the active block, for the "bloco ativo" timeline zoom (null if none)
+export function rotulosRange() {
+  const b = activeBlock();
+  if (!b) return null;
+  const pad = 5 * (api ? api.fps : 25);
+  return [Math.max(0, num(b.inicio) - pad), num(b.fim) + pad];
 }
 
 // true when the key was a labelling shortcut (the caller then ignores it)
@@ -274,7 +390,7 @@ export function rotulosKey(e) {
   if (!lab.keys || e.ctrlKey || e.metaKey || e.altKey) return false;
   const k = e.key.toLowerCase();
   const act = { i: () => mark("inicio_real"), f: () => mark("fim_real"), v: setViva, p: newStoppage,
-    h: () => possession("H"), a: () => possession("A"), enter: next }[k];
+    h: () => possession("H"), a: () => possession("A"), d: () => possession("D"), z: undo, enter: next }[k];
   if (!act) return false;
   e.preventDefault();
   act();
@@ -298,9 +414,24 @@ export function drawRotulos(ctx, a, b, w, row) {
       ctx.fillRect(x(num(r.frame_ref)) - 1, row[0] + row[1] / 2, 2, row[1] / 2);
     }
   }
+  // inside each block: the possession sequence as filled segments, and the block edges as brackets
+  const inBlock = new Set();
+  for (const blk of lab.blocos) {
+    const s = num(blk.inicio), e = num(blk.fim);
+    if (e < a || s > b) continue;
+    const marks = blockMarks(blk);
+    marks.forEach((p, k) => {
+      inBlock.add(p);
+      const f0 = num(p.frame), f1 = k + 1 < marks.length ? num(marks[k + 1].frame) : e;
+      ctx.fillStyle = TEAM_COLOR[p.time] || "#888";
+      ctx.fillRect(x(f0), row[0], Math.max(1, x(f1) - x(f0)), row[1]);
+    });
+    ctx.fillStyle = "#ffffff";
+    for (const f of [s, e]) ctx.fillRect(x(f) - 1, row[0] - 3, 2, row[1] + 6);
+  }
   for (const p of lab.posse) {
     const f = num(p.frame);
-    if (f < a || f > b) continue;
+    if (inBlock.has(p) || f < a || f > b) continue;
     ctx.fillStyle = TEAM_COLOR[p.time] || "#888";
     ctx.fillRect(x(f) - 1, row[0] - 1, 3, row[1] + 2);
   }

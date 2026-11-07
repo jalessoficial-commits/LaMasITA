@@ -34,6 +34,7 @@ LABEL_DIR = os.path.join(ROOT, "analise", "out")
 LABEL_FILES = {
     "rotulos_manuais": "id,categoria,frame_ref,tempo_video,previsto_inicio,previsto_fim,info,inicio_real,fim_real,obs",
     "rotulos_posse": "frame,time,obs",
+    "rotulos_blocos": "bloco,inicio,fim,obs",
 }
 MAX_LABEL_BYTES = 5 << 20
 
@@ -129,7 +130,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         if os.path.exists(path):
             with open(path, encoding="utf-8-sig") as handle:
                 return self._send_text(200, handle.read())
-        if name == "rotulos_posse":                     # starts empty
+        if name in ("rotulos_posse", "rotulos_blocos"):  # start empty
             return self._send_text(200, LABEL_FILES[name] + "\n")
         self.send_error(404, "rode antes: python analise/rotular_paradas.py")
 

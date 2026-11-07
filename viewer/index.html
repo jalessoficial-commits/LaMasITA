@@ -109,6 +109,13 @@
   .rotitem .st.ok { color: #3ddc84; } .rotitem .st.viva { color: var(--muted); } .rotitem .st.meio { color: #ffb74d; }
   .rotitem button { padding: 0 5px; }
   #rotCur { display: grid; gap: 4px; }
+  .posse-btns { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .posse-btns button { font-size: 22px; font-weight: 900; padding: 10px 0; line-height: 1; display: grid; gap: 3px; }
+  .posse-btns small { font-size: 10px; font-weight: 600; opacity: .85; }
+  .posse-btns .pH { background: #1f6fd1; border-color: #1f6fd1; color: #fff; }
+  .posse-btns .pA { background: #ee2523; border-color: #ee2523; color: #fff; }
+  .posse-btns .pD { background: #5b636e; border-color: #5b636e; color: #fff; }
+  .posse-btns button:active { transform: scale(.96); }
   #rotCur input[type=number] { width: 90px; }
   .help kbd { background: var(--panel2); border: 1px solid var(--line); border-radius: 3px; padding: 0 4px; font-size: 10px; }
 
@@ -161,7 +168,7 @@
       </h2>
       <div class="videobox">
         <div class="videoframe">
-          <video id="video" preload="auto" playsinline muted></video>
+          <video id="video" preload="auto" playsinline></video>
           <canvas id="overlay"></canvas>
           <div class="novideo" id="novideo">Sem vídeo. Use <b>&nbsp;🎬 Abrir vídeo&nbsp;</b> ou rode <code>&nbsp;python viewer/serve.py</code>.<br>O tracking e o mapa 2D funcionam mesmo sem vídeo.</div>
         </div>
@@ -196,10 +203,21 @@
         <button id="rotNew" title="nova parada começando no frame atual (P)">+ parada aqui</button>
         <button id="rotDownload" title="baixar os dois CSVs">⬇ CSV</button>
       </div>
+      <h3>Posse por bloco</h3>
+      <div class="rotlist small" id="rotBlocos"></div>
       <div class="row">
-        <button id="rotH" title="troca de posse para o Barcelona no frame atual (H)">posse H</button>
-        <button id="rotA" title="troca de posse para o Athletic no frame atual (A)">posse A</button>
+        <button id="rotBlocoNovo" title="bloco de 5 min começando no frame atual">novo bloco aqui</button>
+        <button id="rotBlocoIni" title="o bloco ativo começa no frame atual">início aqui</button>
+        <button id="rotBlocoFim" title="o bloco ativo termina no frame atual">fim aqui</button>
+        <button id="rotBlocoIr" title="voltar ao início do bloco ativo">⏮</button>
       </div>
+      <div class="help" id="rotBlocoStatus"></div>
+      <div class="posse-btns">
+        <button id="rotH" class="pH" title="Barcelona com a bola a partir deste frame (H)">H<small>Barcelona</small></button>
+        <button id="rotA" class="pA" title="Athletic com a bola a partir deste frame (A)">A<small>Athletic</small></button>
+        <button id="rotD" class="pD" title="bola morta a partir deste frame (D)">D<small>morta</small></button>
+      </div>
+      <div class="row"><button id="rotUndo" title="desfaz a última marca de posse (Z)">↶ desfazer (Z)</button></div>
       <div class="rotlist small" id="rotPosse"></div>
       <div class="help" id="rotSave"></div>
     </div>
@@ -207,10 +225,11 @@
     <div class="help">
       <kbd>Espaço</kbd> play/pause · <kbd>←</kbd><kbd>→</kbd> ±1 frame ·
       <kbd>Shift</kbd>+setas ±1 s · <kbd>Ctrl</kbd>+setas ±10 s ·
-      <kbd>[</kbd><kbd>]</kbd> velocidade · <kbd>G</kbd> início do gabarito ·
+      <kbd>[</kbd><kbd>]</kbd> velocidade · <kbd>M</kbd> som · <kbd>G</kbd> início do gabarito ·
       <kbd>N</kbd> / <kbd>Shift</kbd>+<kbd>N</kbd> próxima / anterior parada ou apito<br>
       rotular: <kbd>I</kbd> início · <kbd>F</kbd> fim · <kbd>V</kbd> viva · <kbd>⏎</kbd> próxima ·
-      <kbd>P</kbd> parada nova · <kbd>H</kbd> / <kbd>A</kbd> troca de posse
+      <kbd>P</kbd> parada nova · posse: <kbd>H</kbd> / <kbd>A</kbd> / <kbd>D</kbd> a partir deste frame ·
+      <kbd>Z</kbd> desfazer
     </div>
   </aside>
 
@@ -227,6 +246,9 @@
         <option value="0.25">0.25×</option><option value="0.5">0.5×</option>
         <option value="1" selected>1×</option><option value="2">2×</option><option value="4">4×</option>
       </select>
+      <button id="mute" title="som do vídeo (M)">🔊</button>
+      <input type="range" id="volume" min="0" max="1" step="0.05" value="0.8" title="volume" style="width:80px">
+
       <span class="clock" id="clock">frame 0</span>
       <input type="number" id="gotoFrame" placeholder="frame">
       <input type="text" id="gotoTime" placeholder="mm:ss" style="width:70px">
@@ -237,6 +259,7 @@
         <option value="h1">Timeline: 1º tempo</option>
         <option value="h2">Timeline: 2º tempo</option>
         <option value="all">Timeline: vídeo inteiro</option>
+        <option value="bloco">Timeline: bloco de posse ativo</option>
       </select>
     </div>
     <input type="range" id="scrub" min="0" max="199318" value="0">
