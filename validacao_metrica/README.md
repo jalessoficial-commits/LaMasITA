@@ -69,6 +69,31 @@ então a diferença é só a qualidade do dono. Bola apagada, média de 5 sement
 - No jogo do desafio o `restart_owner` também usa o Smart Tagging, que preenche parte das paradas sem resposta
   (as laterais vêm sem time). A diferença real deve ser menor que a destes jogos.
 
+## Preditores de posse completos: `posse/predictor.py` (Samuel) e `analise/posse.py` (Nuno)
+
+`testar_predictor_samuel.py` reproduz o `main()` do predictor.py com os arrays da Metrica, com os parâmetros
+do repositório e sem ajuste a estes jogos. Fica de fora o que não existe aqui: Smart Tagging, correção dos
+goleiros (na Metrica cada coluna é um jogador fixo) e bola no ar (depende da homografia). O `posse.py` do
+Nuno é lido da `branch-NUNO`. spellF1, média de 3 sementes nos cenários com bola apagada:
+
+| cenário | jogo | baseline + D | Nuno, custo 25 | Nuno, custo 50 | Samuel | Samuel sem portão | Samuel + dono_reinicio |
+|---|---|---|---|---|---|---|---|
+| bola da Metrica, D exato | 1 | 0,543 | 0,565 | 0,479 | 0,684 | **0,725** | 0,687 |
+| | 2 | 0,522 | 0,560 | 0,503 | 0,683 | **0,719** | 0,689 |
+| bola apagada, D exato | 1 | 0,452 | 0,511 | 0,424 | 0,600 | **0,621** | 0,608 |
+| | 2 | 0,431 | 0,517 | 0,426 | 0,597 | **0,623** | 0,603 |
+| bola apagada, D ±2 s | 1 | 0,417 | 0,485 | 0,402 | 0,563 | **0,581** | 0,562 |
+| | 2 | 0,396 | 0,480 | 0,396 | 0,556 | **0,580** | 0,560 |
+
+- O preditor do Samuel é o melhor com folga: cerca de +0,15 sobre o baseline e +0,08 sobre o do Nuno, nos dois
+  jogos e nos três cenários.
+- Sem o portão ele fica 0,02-0,04 melhor em todos os casos. Ressalva: o gabarito daqui troca de posse a cada
+  evento de passe ou recuperação do outro time, e o Samuel viu nos 5 minutos públicos que o gabarito do desafio
+  ignora muitos toques do adversário. O portão pode ser certo lá e errado aqui; estes jogos não decidem isso.
+- O `dono_reinicio` no lugar do `restart_owner` acrescenta pouco (+0,003 a +0,008, zero com o D deslocado):
+  dentro do Viterbi do Samuel, o dono do reinício pesa menos do que no baseline.
+- O custo de troca do Nuno decide muito (25 contra 50), como já se via acima.
+
 ## Como ligar no jogo do desafio
 
 O dono entra na evidência por frame, antes da suavização, porque é a suavização que espalha o time errado da
