@@ -40,6 +40,7 @@ tracking_bola/out
 tracking_bola/pesos/
 tracking_bola/third_party/*
 !tracking_bola/third_party/*_commit.txt
+posse/out
 
 # -- internal documents ---------------------------------------------------------------------------
 # OVERVIEW.md -- the institutional description of the competition -- IS committed. It is the only
