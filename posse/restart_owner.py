@@ -77,6 +77,28 @@ def read_labels(path, n_frames):
     return table["label"].astype(str).str.strip().str.upper().values
 
 
+def read_dead(path, n_frames, live_ha=False):
+    """Máscara de bola morta (bool por frame) de um dos dois formatos aceitos.
+
+    - frame,morta (analise/out/paradas_D.csv, do detector de paradas): morta = 1 é bola morta.
+    - frame,label (formato de submissão, como o GT público ou evaluation/results/paradas_*.csv):
+      D é bola morta; com live_ha, só H e A contam como vivo (X também vira morta), para usar o GT
+      público e testar só a janela de 5 minutos.
+    """
+    table = pd.read_csv(path)
+    table.columns = [c.strip().lower() for c in table.columns]
+    if len(table) != n_frames:
+        raise ValueError("{}: {} linhas, esperava {}".format(path, len(table), n_frames))
+    if not np.array_equal(table["frame"].values, np.arange(n_frames)):
+        raise ValueError("{}: coluna frame não é 0..{}".format(path, n_frames - 1))
+    if "morta" in table.columns:
+        return table["morta"].fillna(0).astype(int).values == 1
+    if "label" not in table.columns:
+        raise ValueError("{}: esperava a coluna 'morta' ou 'label'".format(path))
+    labels = table["label"].astype(str).str.strip().str.upper().values
+    return ~np.isin(labels, ["H", "A"]) if live_ha else labels == "D"
+
+
 def live_segments(dead, blocks):
     """[(metade, início, fim_exclusivo)] dos trechos vivos dentro das metades avaliadas."""
     segments = []
@@ -281,7 +303,8 @@ def write_submission(path, labels):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--dead", required=True, help="CSV frame,label do detector de bola morta")
+    parser.add_argument("--dead", required=True,
+                        help="bola morta: frame,morta (analise/out/paradas_D.csv) ou frame,label com D")
     parser.add_argument("--live-ha", action="store_true",
                         help="só H e A contam como vivo (X também vira morta); para usar o GT "
                              "público como --dead e testar só a janela de 5 minutos")
@@ -301,8 +324,7 @@ def main():
     pitch = GAMES[GAME]["pitch"]
     blocks = half_video_blocks(GAME)
 
-    labels = read_labels(args.dead, n_frames)
-    dead = ~np.isin(labels, ["H", "A"]) if args.live_ha else labels == "D"
+    dead = read_dead(args.dead, n_frames, args.live_ha)
     segments = live_segments(dead, blocks)
     print("trechos vivos: {}   duração mediana {:.1f} s   curtos (< 1 s): {}".format(
         len(segments), np.median([e - s for _, s, e in segments]) / fps,

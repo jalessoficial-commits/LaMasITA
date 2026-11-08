@@ -848,7 +848,8 @@ def report_public(gt, labels, fps, allow=None):
 def main():
     global TAG_WEIGHT, TOUCH_WEIGHT
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--dead", required=True, help="CSV frame,label da bola morta")
+    parser.add_argument("--dead", required=True,
+                        help="bola morta: frame,morta (analise/out/paradas_D.csv) ou frame,label com D")
     parser.add_argument("--live-ha", action="store_true",
                         help="só H e A contam como vivo (para usar o GT público como --dead)")
     parser.add_argument("--ball", help="CSV da bola própria; sem ele, usa a bola do ATD")
@@ -897,8 +898,7 @@ def main():
     pitch = np.asarray(GAMES[GAME]["pitch"], dtype=float)
     blocks = half_video_blocks(GAME)
 
-    dead_labels = ro.read_labels(args.dead, n_frames)
-    dead = ~np.isin(dead_labels, ["H", "A"]) if args.live_ha else dead_labels == "D"
+    dead = ro.read_dead(args.dead, n_frames, args.live_ha)
     segments = ro.live_segments(dead, blocks)
     print("trechos vivos: {}".format(len(segments)))
 
