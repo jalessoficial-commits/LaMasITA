@@ -1,8 +1,9 @@
 import {
-  LABELS, loadATD, loadHomography, loadSmartTagging, fetchPossession, parsePossession, parseTrackingCSV,
+  LABELS, loadATD, loadHomography, loadSmartTagging, loadEvents, fetchPossession, parsePossession, parseTrackingCSV,
 } from "./loaders.js";
 import { Pitch } from "./pitch.js";
 import { Overlay } from "./overlay.js";
+import { initRotulos, rotulosKey, drawRotulos, rotulosFrame, rotulosRange } from "./rotulos.js";
 
 const GT_URL = "../evaluation/gt/BAR-ATH_possession_gt_public.csv";
 const RESULTS_URL = "../evaluation/results/";
@@ -17,6 +18,10 @@ const TEAM = {
 };
 const LABEL_COLORS = ["#22272e", "#1f6fd1", "#ee2523", "#9aa3ad"]; // X H(azul Barça) A(vermelho Athletic) D
 const TAG_COLORS = { Barcelona: "#1f6fd1", "Atletic Club": "#ee2523" };
+// stoppages (analise/paradas.py) by restart type, and whistles
+const STOP_COLORS = { apito: "#c0ca33", linha_de_fundo: "#ab47bc", lateral: "#26a69a", centro: "#ff7043",
+  campo: "#8d6e63", desconhecida: "#78909c", sem_evento: "#546e7a" };
+const WHISTLE_COLOR = "#ffeb3b";
 
 // Default look of each new layer; extra layers cycle through the alternatives so they stand out.
 const LAYER_STYLES = [
@@ -30,7 +35,7 @@ const $ = (id) => document.getElementById(id);
 const state = {
   frame: 0, playing: false, rate: 1, fps: 25, nFrames: 199319,
   hasVideo: false, gt: null, pred: null, predName: "", predAcc: null,
-  tags: [], layers: [], range: "gt", halves: [],
+  tags: [], events: { apitos: [], paradas: [] }, layers: [], range: "gt", halves: [],
 };
 let pitch, overlay;
 
@@ -40,7 +45,8 @@ async function init() {
   setStatus("carregando tracking oficial…");
   let atd, homography;
   try {
-    [atd, homography, state.tags] = await Promise.all([loadATD(), loadHomography(), loadSmartTagging()]);
+    [atd, homography, state.tags, state.events] = await Promise.all(
+      [loadATD(), loadHomography(), loadSmartTagging(), loadEvents()]);
   } catch (err) {
     setStatus("⚠ dados não encontrados — rode python viewer/preprocess.py (" + err.message + ")");
     console.error(err);
@@ -66,6 +72,12 @@ async function init() {
   tryServedVideo();
   setFrame(GT_WINDOW[0]);
   setStatus("pronto");
+  initRotulos({
+    getFrame: () => state.frame, setFrame: (f) => { if (state.playing) pause(); setFrame(f); }, fps: state.fps,
+    redraw: () => { drawTimelineBase(); drawTimeline(); }, setStatus,
+    pause, isPlaying: () => state.playing,
+    showBlock: () => { state.range = "bloco"; $("range").value = "bloco"; drawTimelineBase(); drawTimeline(); },
+  });
 }
 
 function setStatus(text) { $("status").textContent = text; }
@@ -189,7 +201,7 @@ function renderPossession() {
 // ---- timeline ------------------------------------------------------------------------------
 
 const timelineBase = document.createElement("canvas");
-const ROWS = { gt: [2, 18], pred: [22, 16], err: [40, 5], tags: [48, 20] };
+const ROWS = { gt: [2, 18], pred: [22, 16], err: [40, 5], tags: [48, 20], ev: [70, 12], lab: [86, 10] };
 
 function viewRange() {
   const [h1, h2] = state.halves.length ? state.halves : [[1, 11185, 90651], [2, 110808, 190197]];
@@ -197,6 +209,7 @@ function viewRange() {
     case "h1": return [h1[1], h1[2]];
     case "h2": return [h2[1], h2[2]];
     case "all": return [0, state.nFrames - 1];
+    case "bloco": return rotulosRange() || GT_WINDOW;
     default: return GT_WINDOW;
   }
 }
@@ -239,6 +252,22 @@ function drawTimelineBase() {
     ctx.fillRect(x0, ROWS.tags[0], Math.max(1, x1 - x0), ROWS.tags[1]);
     ctx.globalAlpha = 1;
   }
+  // stoppages (bars by type) and whistles (ticks) -- only when viewer/data/eventos.json exists
+  for (const p of state.events.paradas || []) {
+    if (p.end_frame < a || p.start_frame > b) continue;
+    const x0 = ((p.start_frame - a) / span) * w;
+    const x1 = ((p.end_frame - a) / span) * w;
+    ctx.fillStyle = STOP_COLORS[p.tipo] || "#78909c";
+    ctx.globalAlpha = 0.8;
+    ctx.fillRect(x0, ROWS.ev[0], Math.max(1, x1 - x0), ROWS.ev[1]);
+    ctx.globalAlpha = 1;
+  }
+  ctx.fillStyle = WHISTLE_COLOR;
+  for (const [s] of state.events.apitos || []) {
+    if (s < a || s > b) continue;
+    ctx.fillRect(((s - a) / span) * w - 1, ROWS.ev[0] - 2, 2, ROWS.ev[1] + 4);
+  }
+  drawRotulos(ctx, a, b, w, ROWS.lab);
   ctx.fillStyle = "#8b95a3";
   ctx.font = "10px system-ui";
   ctx.fillText(`${a}`, 3, h - 2);
@@ -290,7 +319,13 @@ function play() {
   $("play").textContent = "⏸ Pause";
   if (state.hasVideo) {
     video.playbackRate = state.rate;
-    video.play();
+    video.play().catch((err) => {
+      if (err.name !== "NotAllowedError" || video.muted) return;
+      video.muted = true;                    // the browser refused sound without a click: play muted
+      updateSoundUI();
+      setStatus("som bloqueado pelo navegador: clique em 🔇 para ligar");
+      video.play().catch(() => {});
+    });
   } else {
     let last = performance.now();
     let acc = 0;
@@ -319,6 +354,33 @@ function onVideoFrame(_now, metadata) {
   const f = Math.round(metadata.mediaTime * state.fps);
   if (f !== state.frame) setFrame(f, true);
   video.requestVideoFrameCallback(onVideoFrame);
+}
+
+// ---- sound: on by default, the choice is remembered per browser ---------------------------------
+
+function loadSoundPrefs() {
+  let prefs = { muted: false, volume: 0.8 };
+  try { prefs = { ...prefs, ...JSON.parse(localStorage.getItem("viewer_som") || "{}") }; } catch { /* default */ }
+  video.muted = prefs.muted;
+  video.volume = Math.min(1, Math.max(0, prefs.volume));
+  updateSoundUI();
+}
+
+function saveSoundPrefs() {
+  try { localStorage.setItem("viewer_som", JSON.stringify({ muted: video.muted, volume: video.volume })); } catch { /* ignore */ }
+}
+
+function updateSoundUI() {
+  const off = video.muted || video.volume === 0;
+  $("mute").textContent = off ? "🔇" : "🔊";
+  $("volume").value = video.volume;
+}
+
+function toggleSound() {
+  video.muted = !video.muted;
+  if (!video.muted && video.volume === 0) video.volume = 0.8;
+  updateSoundUI();
+  saveSoundPrefs();
 }
 
 function attachVideo(src, label) {
@@ -379,6 +441,7 @@ function render() {
   overlay.draw(f, $("showOverlay").checked ? layers : [], $("showLines").checked);
   renderPossession();
   drawTimeline();
+  rotulosFrame(f);
   $("scrub").value = f;
   $("clock").textContent = `frame ${f} · ${fmtTime(f / state.fps)} · ${matchClock(f)}`;
   const active = state.tags.filter((t) => t.start_frame <= f && f < t.end_frame);
@@ -478,20 +541,41 @@ function bindUI() {
     }
   };
 
+  loadSoundPrefs();
+  $("mute").onclick = toggleSound;
+  $("volume").oninput = (e) => {
+    video.volume = +e.target.value;
+    video.muted = video.volume === 0;
+    updateSoundUI();
+    saveSoundPrefs();
+  };
+
   window.addEventListener("resize", onResize);
   window.addEventListener("keydown", (e) => {
     if (e.target.matches("input[type=text], input[type=number], select")) return;
+    if (rotulosKey(e)) return;
     const big = e.ctrlKey || e.metaKey ? 250 : e.shiftKey ? 25 : 1;
     if (e.code === "Space") { e.preventDefault(); state.playing ? pause() : play(); }
     else if (e.key === "ArrowRight") { e.preventDefault(); step(big); }
     else if (e.key === "ArrowLeft") { e.preventDefault(); step(-big); }
     else if (e.key === "g" || e.key === "G") setFrame(GT_WINDOW[0]);
+    else if (e.key === "m" || e.key === "M") toggleSound();
+    else if (e.key === "n" || e.key === "N") jumpToEvent(e.shiftKey ? -1 : 1);
     else if (e.key === "[" || e.key === "]") {
       const sel = $("rate");
       sel.selectedIndex = Math.max(0, Math.min(sel.options.length - 1, sel.selectedIndex + (e.key === "]" ? 1 : -1)));
       sel.onchange({ target: sel });
     }
   });
+}
+
+// next/previous stoppage start or whistle (N / Shift+N), for checking and hand-labelling
+function jumpToEvent(dir) {
+  const marks = [...(state.events.paradas || []).map((p) => p.start_frame),
+                 ...(state.events.apitos || []).map((x) => x[0])].sort((x, y) => x - y);
+  const f = state.frame;
+  const target = dir > 0 ? marks.find((m) => m > f + 1) : [...marks].reverse().find((m) => m < f - 1);
+  if (target !== undefined) setFrame(Math.max(0, target - 3 * state.fps));   // 3 s before, to see it coming
 }
 
 init();

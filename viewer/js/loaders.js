@@ -60,6 +60,18 @@ export async function loadSmartTagging() {
   }
 }
 
+// Optional: whistles and stoppages from analise/paradas.py (viewer/data/eventos.json).
+// {apitos: [[start_frame, end_frame, snr_db], ...], paradas: [{start_frame, end_frame, tipo, ...}, ...]}
+// ?eventos=eventos_kalman_pred_fora loads viewer/data/eventos_kalman_pred_fora.json instead.
+export async function loadEvents() {
+  const name = new URLSearchParams(location.search).get("eventos") || "eventos";
+  try {
+    return await fetchJSON("data/" + name.replace(/[^\w-]/g, "") + ".json");
+  } catch {
+    return { apitos: [], paradas: [] };
+  }
+}
+
 // ---- possession CSVs: frame,label --------------------------------------------------------------
 
 export function parsePossession(text, nFrames) {
