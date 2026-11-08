@@ -37,7 +37,11 @@ Para usar outra porta: `python viewer/serve.py --port 8001`.
 | **Vídeo + overlay** | O tracking é projetado sobre o vídeo pela homografia de cada frame. A opção "linhas do campo" serve para conferir a homografia. |
 | **Mapa 2D** | Campo de 105,3 × 68 m, com opção de inverter X e Y. |
 | **Camadas** | Cada fonte de tracking (o ATD oficial e cada CSV extra) tem cor por time e para a bola, forma, tamanho, opacidade, IDs e rastro, e pode ser ligada no vídeo e/ou no 2D. Isso permite sobrepor as fontes. |
-| **Timeline** | Linhas: gabarito · predição · erros (vermelho) · smart tagging. Clique ou arraste para navegar. O zoom pode mostrar a janela do gabarito, o 1º tempo, o 2º tempo ou o vídeo inteiro. |
+| **Timeline** | Linhas: gabarito · predição · erros (vermelho) · smart tagging · paradas e apitos. Clique ou arraste para navegar. O zoom pode mostrar a janela do gabarito, o 1º tempo, o 2º tempo ou o vídeo inteiro. |
+| **Rotular** | Painel lateral para rotular à mão, salvo direto em `analise/out/` pelo `serve.py`, com backup `.bak` da versão anterior. Mostra a fila de `rotulos_manuais.csv`, gerada por `python analise/rotular_paradas.py`. A fila é cega de propósito: só id e tempo, sem a categoria nem o previsto. Teclas: **I** início, **F** fim, **V** "viva" (não houve parada), **⏎** próxima, **P** parada nova a partir daqui, **H** / **A** troca de posse para o time (`rotulos_posse.csv`). Os rótulos aparecem em verde na última linha da timeline. Para rotular sem ver as paradas previstas, abra `?eventos=nenhum`. |
+| **Posse por bloco** | No painel Rotular: **novo bloco aqui** cria um trecho de 5 min a partir do frame atual (bordas ajustáveis com **início aqui** / **fim aqui**; a timeline passa ao intervalo "bloco"). Marque quem tem a bola no início e depois cada troca com os botões grandes ou as teclas **H** / **A** / **D** (D = bola morta, do apito até o reinício); **Z** desfaz. O vídeo para no fim do bloco. Salvo em `rotulos_blocos.csv` + `rotulos_posse.csv`; `analise/rotular_paradas.gt_blocos(N)` vira um gabarito no formato oficial (H/A/D nos blocos, X fora). |
+| **Som** | O vídeo toca com áudio (apitos). Botão de mudo / tecla **M** e volume, lembrados no navegador; se o navegador bloquear o autoplay com som, o vídeo segue mudo. |
+| **Paradas e apitos** | Opcional: lê `viewer/data/eventos.json`, gerado por `analise/03_detector_paradas.ipynb`; `?eventos=<nome>` lê `viewer/data/<nome>.json` (ex.: as variantes de `analise/exportar_viewer_tracking.py`). As barras são as paradas detectadas, coloridas pelo tipo de início (apito, linha de fundo, lateral, centro, sem evento); os tiques amarelos são os apitos detectados no áudio. Sem o arquivo, a linha fica vazia. |
 | **Navegação** | Play/pause, ±1 frame, ±1 s, ±10 s, velocidade de 0,25× a 4×, ir para frame e ir para tempo (`mm:ss`). |
 
 ### Atalhos
@@ -50,6 +54,7 @@ Para usar outra porta: `python viewer/serve.py --port 8001`.
 | `Ctrl` + setas | ±10 s |
 | `[` / `]` | velocidade |
 | `G` | início do gabarito |
+| `N` / `Shift` + `N` | próxima / anterior parada ou apito (para 3 s antes) |
 
 ## Formato do tracking extra
 
