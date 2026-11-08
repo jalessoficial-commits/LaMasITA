@@ -94,6 +94,38 @@ Nuno é lido da `branch-NUNO`. spellF1, média de 3 sementes nos cenários com b
   dentro do Viterbi do Samuel, o dono do reinício pesa menos do que no baseline.
 - O custo de troca do Nuno decide muito (25 contra 50), como já se via acima.
 
+## O portão em 2 jogos da Bundesliga (gabarito por frame da DFL)
+
+`dfl.py` lê os jogos abertos da DFL (Sportec/IDSSE, 2022/23; Bassek et al. 2025, *Scientific Data*), cujo
+tracking traz por frame `BallStatus` e `BallPossession`. `testar_portao_dfl.py` roda o baseline e o preditor
+do Samuel com e sem portão em J03WN1 e J03WOH. O gabarito da DFL troca de posse quase a cada toque (posse
+média de 5-7 s, 46-76 posses de menos de 1 s por jogo), então também testei uma versão "sem toques", em que
+as posses de menos de 1 s voltam ao time anterior (CHALLENGE.md: toque sem controle não troca a posse).
+
+spellF1, média de 3 sementes com a bola apagada:
+
+| gabarito | cenário | jogo | baseline + D | Samuel | Samuel sem portão |
+|---|---|---|---|---|---|
+| DFL bruto | bola completa, D exato | J03WN1 | 0,462 | 0,538 | **0,610** |
+| | | J03WOH | 0,487 | 0,592 | **0,614** |
+| | bola apagada, D exato | J03WN1 | 0,390 | 0,451 | **0,481** |
+| | | J03WOH | 0,398 | 0,498 | **0,526** |
+| | bola apagada, D ±2 s | J03WN1 | 0,333 | 0,385 | **0,408** |
+| | | J03WOH | 0,360 | 0,450 | **0,476** |
+| DFL sem toques | bola completa, D exato | J03WN1 | 0,498 | 0,608 | **0,665** |
+| | | J03WOH | 0,506 | 0,652 | **0,666** |
+| | bola apagada, D exato | J03WN1 | 0,419 | 0,521 | **0,541** |
+| | | J03WOH | 0,414 | 0,556 | **0,578** |
+| | bola apagada, D ±2 s | J03WN1 | 0,367 | 0,458 | **0,471** |
+| | | J03WOH | 0,376 | 0,503 | **0,524** |
+
+- Sem o portão é melhor nas 12 comparações, por 0,013 a 0,072. A diferença diminui com o gabarito
+  "sem toques", mas não troca de sinal.
+- O preditor do Samuel supera o baseline por 0,05 a 0,15 em todos os casos.
+- Ressalva central: a bola da DFL é limpa. Ela não pula para outros objetos e, como vem de tracking 3D, uma
+  bola alta aparece no lugar certo do gramado. O portão foi feito para filtrar justamente esses dois erros
+  do ATD do desafio, então estes jogos medem o custo do portão, mas não o benefício dele.
+
 ## Como ligar no jogo do desafio
 
 O dono entra na evidência por frame, antes da suavização, porque é a suavização que espalha o time errado da
