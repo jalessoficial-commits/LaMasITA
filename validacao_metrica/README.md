@@ -49,6 +49,26 @@ Acerto de cada sinal quando ele responde (bola apagada, D exato):
 O "último jogador perto da bola" antes da saída acertou só ~50%, porque perto da linha quase sempre há um
 adversário colado. Por isso o sinal usa o último salto de velocidade da bola (o chute).
 
+## Comparação com `posse/restart_owner.py`
+
+`testar_restart_owner.py` roda o `restart_owner.decide` do Samuel no mesmo teste, sem Smart Tagging (estes
+jogos não têm) e com a bola segurada por até 5 s, como no script dele. O dono entra do mesmo jeito para todos,
+então a diferença é só a qualidade do dono. Bola apagada, média de 5 sementes:
+
+| cenário | jogo | acerto do dono: restart_owner | dono_reinicio | spellF1: restart_owner | dono_reinicio |
+|---|---|---|---|---|---|
+| D exato | 1 | 74% | 93% | 0,473 | 0,482 |
+| | 2 | 74% | 93% | 0,441 | 0,448 |
+| D com erro de ±2 s | 1 | 69% | 85% | 0,433 | 0,440 |
+| | 2 | 70% | 84% | 0,402 | 0,410 |
+
+- O `restart_owner` fica sem resposta em ~20% das paradas. Nelas, o último chute e a posse antes do apito
+  acertam 65-78%.
+- Quando o `restart_owner` decide com confiança, acerta 93%; o `dono_reinicio`, nas mesmas paradas, 93-97%.
+  Hipótese ainda não testada: o raio de 5 m e a bola segurada por 5 s deixam votar quem não é o cobrador.
+- No jogo do desafio o `restart_owner` também usa o Smart Tagging, que preenche parte das paradas sem resposta
+  (as laterais vêm sem time). A diferença real deve ser menor que a destes jogos.
+
 ## Como ligar no jogo do desafio
 
 O dono entra na evidência por frame, antes da suavização, porque é a suavização que espalha o time errado da
