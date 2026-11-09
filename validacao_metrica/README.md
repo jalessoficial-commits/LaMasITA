@@ -14,6 +14,13 @@ cd ../metrica-sample-data && git sparse-checkout set data/Sample_Game_1 data/Sam
 python validacao_metrica/testar_dono_reinicio.py       # alguns minutos; METRICA_DIR muda a pasta dos dados
 ```
 
+Os jogos da Bundesliga (Sportec/DFL, ~350-420 MB de posições cada) vêm do Hugging Face; o docstring de `dfl.py`
+mostra os dois arquivos de cada jogo. Ficam em `../dfl-idsse-data` (ou `DFL_DIR`):
+
+```bash
+python validacao_metrica/testar_detector_paradas.py J03WN1 J03WOH J03WOY metrica1 metrica2
+```
+
 `metrica.py` monta um gabarito H/A/D por frame a partir dos eventos (a regra está no docstring). São 88 e 90
 paradas e cerca de 370 posses por jogo, com posse média de 9-10 s.
 
@@ -126,6 +133,47 @@ spellF1, média de 3 sementes com a bola apagada:
   bola alta aparece no lugar certo do gramado. O portão foi feito para filtrar justamente esses dois erros
   do ATD do desafio, então estes jogos medem o custo do portão, mas não o benefício dele.
 
+## Detector de paradas: `analise/paradas.py` + `analise/reinicio.py`
+
+`testar_detector_paradas.py` roda o detector do Nuno na configuração da equipe e mede o efeito do D em cada
+preditor de posse. A bola é apagada em 41% dos frames avaliados, como no ATD. O apito e o Smart Tagging não
+existem nestes jogos e são emulados (regras no docstring do script); o v1 usa só o nó N1, porque a árvore completa
+é ajustada no Smart Tagging do BAR-ATH.
+
+**O detector atual** (3 jogos da Bundesliga, 2 sementes): encontra ~62% das paradas, e ~76% das paradas previstas
+são corretas (IoU >= 0,5). Quase nenhuma parada é inventada do nada; o que falha é:
+
+- o fim sai cedo: nas paradas fechadas pelo v1, em mediana 3,5 s antes do reinício, porque o v1 olha a velocidade
+  dos PRÓXIMOS 5 s;
+- laterais e faltas cobradas rápido (3-20 s) se perdem: o evento de início existe, mas os jogadores não desaceleram
+  e nada confirma a parada.
+
+**`analise/reinicio.py`** entra depois do `detectar_paradas`, sem mudar o código dele:
+
+1. *Fim no chute de reinício*: o fim passa ao primeiro chute de bola parada (lenta nos 0,5 s antes, rápida nos
+   0,3 s depois, com um jogador a até 2,5 m) entre 4 s antes e 5 s depois do fim proposto. Sem chute visível, nas
+   paradas do v1: a arrancada coletiva até 6 s depois, ou +2 s.
+2. *Paradas confirmadas pela cobrança*: um evento de início sem D é confirmado se vier uma cobrança (bola parada
+   por 1,5 s e chutada) num lugar compatível com o tipo, dentro do tempo máximo, sem nenhum outro chute no meio.
+
+spellF1, 2 sementes por jogo:
+
+| preditor | Bundesliga (3 jogos): D atual | D com reinicio.py | D do gabarito | Metrica (2 jogos): D atual | D com reinicio.py | D do gabarito |
+|---|---|---|---|---|---|---|
+| Samuel sem portão | 0,343 | **0,375** | 0,476 | 0,581 | **0,592** | 0,713 |
+| Samuel | 0,318 | **0,348** | 0,453 | 0,545 | **0,560** | 0,675 |
+| baseline | 0,283 | **0,307** | 0,382 | 0,431 | **0,439** | 0,524 |
+| Nuno, custo 25 | 0,273 | **0,295** | 0,378 | 0,461 | **0,466** | 0,557 |
+| Nuno, custo 50 | 0,218 | **0,236** | 0,313 | 0,394 | 0,391 | 0,487 |
+
+- Ganho positivo nos 5 jogos e em 47 de 50 rodadas (5 jogos x 2 sementes x 5 preditores).
+- No detector (Bundesliga): erro no fim de 2,8 s para ~0,6 s, sem viés; paradas encontradas de 62% para 68%.
+- Uma primeira versão (busca até 8 s depois e +3,5 s sem chute) ganhava na Bundesliga mas atrasava o fim ~1,7 s na
+  Metrica. A janela e o deslocamento atuais foram escolhidos numa grade nestes 5 jogos pelo viés do fim das
+  paradas (~0 nos dois conjuntos), não pelo spellF1; ainda assim, o ganho pode estar um pouco otimista.
+- O que falta até o D do gabarito (~0,10) vem de paradas sem nenhum evento de início e de paradas próximas
+  fundidas numa só, quando o primeiro reinício não aparece.
+
 ## Como ligar no jogo do desafio
 
 O dono entra na evidência por frame, antes da suavização, porque é a suavização que espalha o time errado da
@@ -141,6 +189,16 @@ sub = T.combine_with_baseline(smooth(DR.aplicar_donos(raw, donos)), dead, S.grad
 ```
 
 Com outro classificador de H/A, `aplicar_donos` vale do mesmo jeito sobre a evidência dele por frame.
+
+O `reinicio.py` entra logo depois do detector de paradas, com os mesmos eventos de início:
+
+```python
+import eventos as E, paradas as P, reinicio as RE
+cfg = P.Config(v1_uniao=True)
+inicio = E.eventos_inicio(S, cfg.usar_inicio, fora=True)
+dead, tabela = P.detectar_paradas(S, cfg, inicio=inicio)
+dead, tabela = RE.aplicar(S, tabela, inicio, cfg)         # usa S.ball e S.players, em metros
+```
 
 ## Limites
 
