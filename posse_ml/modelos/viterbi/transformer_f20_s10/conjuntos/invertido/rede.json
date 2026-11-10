@@ -1,0 +1,16 @@
+{
+ "tipo": "transformer",
+ "hiper": {
+  "epocas": 20,
+  "epocas_rapido": 5,
+  "largura": 64,
+  "lote": 32,
+  "lr": 0.001,
+  "dropout": 0.1,
+  "camadas": 3,
+  "cabecas": 4,
+  "semente": 10
+ },
+ "passo": 2,
+ "janela": 256
+}
