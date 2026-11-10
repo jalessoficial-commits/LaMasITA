@@ -1,0 +1,10 @@
+# O que o posse_ml precisa, fixado. Testado com Python 3.13 (numpy 2.5 e scipy 1.18 pedem 3.12+).
+#
+# O scikit-learn tem que ser exatamente o que treinou os modelos em modelos/conjuntos, que são
+# pickles dele: outra versão pode não abrir os arquivos ou dar outra saída. Se você treinar com
+# outras versões, troque os números aqui pelas que você usou (pip freeze), para a submissão sair
+# igual em qualquer máquina. A leitura da DFL usa só a biblioteca padrão (xml.etree).
+numpy==2.5.3
+pandas==3.0.5
+scipy==1.18.1
+scikit-learn==1.9.1

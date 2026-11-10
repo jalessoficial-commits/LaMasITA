@@ -1,0 +1,10 @@
+# Só para os outros classificadores (--classificador xgboost | lightgbm | catboost | gru | lstm | tcn | transformer).
+# O hgb, o padrão, não precisa de nada disto. Fixados nas versões testadas, porque os modelos são
+# salvos em pickle (árvores) ou state_dict (redes) e outra versão pode não abrir.
+xgboost==3.4.1
+lightgbm==4.7.0
+catboost==1.2.10
+# PyTorch (gru, lstm, tcn, transformer): o "pip install torch" do PyPI no Windows é só CPU. Para usar a GPU (--gpu),
+# instale pelo seletor de https://pytorch.org/get-started/locally/ (Windows, pip, CUDA) e anote aqui a
+# versão que ficou (pip freeze), para a submissão sair igual em outra máquina.
+torch

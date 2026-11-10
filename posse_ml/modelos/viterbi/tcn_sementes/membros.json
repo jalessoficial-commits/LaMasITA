@@ -1,0 +1,12 @@
+{
+ "classificadores": [
+  "tcn",
+  "tcn_s1",
+  "tcn_s2"
+ ],
+ "pastas": [
+  "..\\tcn",
+  "..\\tcn_s1",
+  "..\\tcn_s2"
+ ]
+}

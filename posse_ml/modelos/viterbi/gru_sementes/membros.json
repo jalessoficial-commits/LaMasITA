@@ -1,0 +1,12 @@
+{
+ "classificadores": [
+  "gru",
+  "gru_s1",
+  "gru_s2"
+ ],
+ "pastas": [
+  "..\\gru",
+  "..\\gru_s1",
+  "..\\gru_s2"
+ ]
+}

@@ -74,14 +74,21 @@ TOUCH_MARGIN = 0.75    # m de folga sobre o adversário mais próximo; senão é
 AFTER_FRAMES = 12      # frames depois do toque (~0,5 s) para ver quem sai com a bola
 AFTER_MIN_FRAMES = 6   # frames com distâncias medidas exigidos nessa janela
 AFTER_RADIUS = 2.0     # m: distância média até a bola de quem "sai com ela"
-TOUCH_WEIGHT = 1.5     # sem o portão: um toque claro paga uma troca (1), mas não duas sozinho
+TOUCH_WEIGHT_UNGATED = 1.5  # sem o portão: um toque claro paga uma troca (1), mas não duas sozinho
+TOUCH_WEIGHT = TOUCH_WEIGHT_UNGATED  # o valor em uso; main() escolhe entre os dois acima
 TOUCH_WEIGHT_GATED = 0.5  # com o portão: o toque libera a troca, mas sozinho não a paga
 
 # Portão: o toque do novo time é condição NECESSÁRIA para a troca (não suficiente)
 GATE_NOISE_FACTOR = 2.0   # eventos do portão: picos de dv acima de 2x o ruído típico...
 GATE_DV_MIN = 3.0         # ...e de pelo menos 3 m/s
 GATE_RADIUS = 3.0         # m: algum jogador do novo time a até isso da bola, mesmo sem ser o mais perto
-GATE_WINDOW = 25          # frames (1 s) de cada lado do evento em que a troca fica liberada
+GATE_WINDOW_DEFAULT = 15  # frames (0,6 s) DEPOIS do evento em que a troca fica liberada (--gate-window).
+                          # Com 25, as trocas certas saíam ~20 frames adiantadas: um evento cedo (o novo
+                          # time perto da bola antes de ganhá-la) liberava a troca, e a proximidade a
+                          # pagava antes do toque. Com 15, nenhuma troca verdadeira do GT público fica
+                          # bloqueada e o desvio mediano cai para -11 (D do GT) / -3 (D do Nuno).
+GATE_WINDOW = GATE_WINDOW_DEFAULT  # os valores em uso; main() os define a cada rodada
+GATE_BEFORE = GATE_WINDOW_DEFAULT  # frames ANTES do evento (--gate-before; sem ele, igual a GATE_WINDOW)
 FLIGHT_SPEED = 12.0       # m/s: bola rápida antes E depois...
 FLIGHT_ANGLE = 30.0       # ...e com menos que isso de mudança de direção = bola em voo, não toque
 REAPPEAR_GAP = 10         # frames: lacuna da bola a partir da qual o reaparecimento pode liberar troca
@@ -525,7 +532,8 @@ def gate_mask(dv, v_in, v_out, d_home, d_away, ball_m, segments, noise, air=None
     """allow[time, frame]: onde a troca PARA esse time é permitida (toque = condição necessária).
 
     1. Eventos permissivos: picos de dv acima de GATE_NOISE_FACTOR x o ruído, sem os de voo. Cada
-       evento libera, por ±GATE_WINDOW frames, a troca para todo time que tenha ALGUM jogador a até
+       evento libera, de GATE_BEFORE frames antes a GATE_WINDOW depois, a troca para todo time que
+       tenha ALGUM jogador a até
        GATE_RADIUS da bola, mesmo sem ser o mais perto (em 11351 e 15766 o recebedor do Barça
        estava a 2-3 m e um marcador do Athletic mais perto).
     2. Reaparecimento: quando a bola some por REAPPEAR_GAP frames ou mais e reaparece com um time
@@ -551,7 +559,7 @@ def gate_mask(dv, v_in, v_out, d_home, d_away, ball_m, segments, noise, air=None
                 ok = air[side][lo:hi].min() <= AIR_GATE_RADIUS
                 stats["aereos"] += int(ok)
             if ok:
-                allow[side, max(0, t - GATE_WINDOW):t + GATE_WINDOW + 1] = True
+                allow[side, max(0, t - GATE_BEFORE):t + GATE_WINDOW + 1] = True
                 stats["frames"][side].append(t)
 
     known = np.isfinite(ball_m[:, 0])
@@ -846,7 +854,7 @@ def report_public(gt, labels, fps, allow=None):
 # ------------------------------------------------------------------------------------------------
 
 def main():
-    global TAG_WEIGHT, TOUCH_WEIGHT
+    global TAG_WEIGHT, TOUCH_WEIGHT, GATE_WINDOW, GATE_BEFORE
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--dead", required=True,
                         help="bola morta: frame,morta (analise/out/paradas_D.csv) ou frame,label com D")
@@ -880,6 +888,11 @@ def main():
                              "no GT público adiantou trocas que já saíam cedo)")
     parser.add_argument("--no-gate", action="store_true",
                         help="política antiga: sem o portão, toque com peso 1,5 (para comparar)")
+    parser.add_argument("--gate-window", type=int, default=GATE_WINDOW_DEFAULT,
+                        help="frames depois de cada evento do portão em que a troca fica liberada; "
+                             "também vale para antes, se --gate-before não for dado (padrão 15 = 0,6 s)")
+    parser.add_argument("--gate-before", type=int, default=None,
+                        help="frames ANTES de cada evento do portão (padrão: igual a --gate-window)")
     parser.add_argument("--touch-weight", type=float, default=None,
                         help="evidência de um toque estrito (padrão: 0,5 com o portão, 1,5 sem)")
     parser.add_argument("--out", default=os.path.join(OUT_DIR, "posse.csv"),
@@ -888,10 +901,14 @@ def main():
                                                      "BAR-ATH_possession_gt_public.csv"))
     args = parser.parse_args()
     TAG_WEIGHT = args.tag_weight
+    GATE_WINDOW = args.gate_window
+    GATE_BEFORE = args.gate_window if args.gate_before is None else args.gate_before
+    # sempre atribuído: em várias rodadas no mesmo processo (comparar_bolas, varrer_portao), o valor
+    # de uma rodada não pode vazar para a seguinte
     if args.touch_weight is not None:
         TOUCH_WEIGHT = args.touch_weight
-    elif not args.no_gate:
-        TOUCH_WEIGHT = TOUCH_WEIGHT_GATED
+    else:
+        TOUCH_WEIGHT = TOUCH_WEIGHT_UNGATED if args.no_gate else TOUCH_WEIGHT_GATED
 
     n_frames = source_frames("tactical", GAME)
     fps = GAMES[GAME]["fps"]
@@ -984,8 +1001,10 @@ def main():
         for _, s, e in segments:
             live_mask[s:e] = True
         print("portão: {} eventos (limiar {:.1f} m/s; {} descartados como voo), {} reaparecimentos; "
+              "janela de {} frames antes a {} depois; "
               "troca liberada em {:.0%} dos frames vivos para H e {:.0%} para A".format(
                   gate["eventos"], gate["limiar"], gate["voo"], gate["reaparecimentos"],
+                  GATE_BEFORE, GATE_WINDOW,
                   allow[ro.HOME, live_mask].mean(), allow[ro.AWAY, live_mask].mean()))
     speed = ball_speed(ball_m, fps) if args.prox_control else None
     ev = proximity_evidence(d_home, d_away, speed)
