@@ -1,0 +1,18 @@
+{
+ "classificadores": [
+  "tcn_f5_s10",
+  "tcn_f5_s11",
+  "tcn_f5_s12",
+  "tcn_f5_s20",
+  "tcn_f5_s21",
+  "tcn_f5_s22"
+ ],
+ "pastas": [
+  "..\\tcn_f5_s10",
+  "..\\tcn_f5_s11",
+  "..\\tcn_f5_s12",
+  "..\\tcn_f5_s20",
+  "..\\tcn_f5_s21",
+  "..\\tcn_f5_s22"
+ ]
+}

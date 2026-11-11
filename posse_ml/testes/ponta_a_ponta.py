@@ -18,7 +18,7 @@ import time
 
 import numpy as np
 
-from posse_ml import config, degradacao
+from posse_ml import config, degradacao, metrica
 from posse_ml.config import D, FPS, X
 from posse_ml.janelas import trechos
 from posse_ml.testes import sintetico
@@ -135,6 +135,7 @@ def main(argv=None):
             ["posse_ml", "--modelos", mod, "--paradas", os.path.join(raiz, "paradas_D.csv")],
             ["posse_ml.calibrar", "--modelos", mod, "--paradas", os.path.join(raiz, "paradas_D.csv")],
             ["posse_ml", "--modelos", mod, "--paradas", os.path.join(raiz, "paradas_D.csv"), "--modo-paradas", "suave"],
+            ["posse_ml.testar_arvores", "--teste", "--arvores", "50", "400", "--folhas", "15"],
         ]
         if args.classificadores:
             # os outros pelo comparar_classificadores, com modelos pequenos; o hgb já está treinado acima
@@ -153,6 +154,12 @@ def main(argv=None):
             if "tcn" in outros:
                 passos.append(["posse_ml.testar_variantes", "--teste", "--variantes", "lstm", "tcn_e20", "transformer", "tcn_e5"])
                 passos.append(["posse_ml.testar_epocas", "--teste", "--classificadores", "tcn", "--epocas", "5", "10",
+                               "--sementes", "0", "1"])
+                passos.append(["posse_ml.testar_epocas", "--teste", "--classificadores", "tcn", "--epocas", "5", "10",
+                               "--sementes", "0", "1", "--validacao", "igual"])
+                if metrica.jogos():
+                    passos.append(["posse_ml.testar_dados", "--teste", "--classificadores", "tcn", "--sementes", "7"])
+                passos.append(["posse_ml.testar_configs", "--teste", "--configs", "tcn_d03", "tcn_b4", "--epocas", "5",
                                "--sementes", "0", "1"])
         for passo in passos:
             print("\n$ python -m " + " ".join(passo), flush=True)

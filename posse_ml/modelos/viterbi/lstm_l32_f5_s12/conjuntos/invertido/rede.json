@@ -1,0 +1,16 @@
+{
+ "tipo": "lstm",
+ "hiper": {
+  "epocas": 5,
+  "epocas_rapido": 5,
+  "largura": 32,
+  "lote": 32,
+  "lr": 0.002,
+  "dropout": 0.1,
+  "janela": 256,
+  "camadas": 2,
+  "semente": 12
+ },
+ "passo": 2,
+ "janela": 256
+}

@@ -1,0 +1,18 @@
+{
+    "classificadores":  [
+                            "lstm_f5_s10",
+                            "lstm_f5_s11",
+                            "lstm_f5_s12",
+                            "lstm_f5_s20",
+                            "lstm_f5_s21",
+                            "lstm_f5_s22"
+                        ],
+    "pastas":  [
+                   "lstm_f5_s10",
+                   "lstm_f5_s11",
+                   "lstm_f5_s12",
+                   "lstm_f5_s20",
+                   "lstm_f5_s21",
+                   "lstm_f5_s22"
+               ]
+}

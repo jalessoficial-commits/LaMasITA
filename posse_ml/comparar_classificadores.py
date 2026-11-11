@@ -89,7 +89,7 @@ def rodar(modulo_e_args, log):
         return proc.wait()
 
 
-def treinar_pasta(inst, clf, pasta, hiper="", completo=False, sem_gpu=False, passo=None, nome=None):
+def treinar_pasta(inst, clf, pasta, hiper="", completo=False, sem_gpu=False, passo=None, nome=None, extra=None):
     """Roda o treinar.py de `clf` com os modelos em `pasta` (validação rápida, a não ser com completo;
     na GPU quando dá). Devolve (deu certo, descrição do tempo)."""
     usa_gpu = not sem_gpu and gpu(clf)
@@ -101,6 +101,7 @@ def treinar_pasta(inst, clf, pasta, hiper="", completo=False, sem_gpu=False, pas
     cmd += [] if completo else ["--rapido"]
     cmd += ["--gpu"] if usa_gpu else []
     cmd += ["--passo", str(passo)] if passo else []
+    cmd += list(extra or [])
     t0 = time.time()
     codigo = rodar(cmd, os.path.join(config.CACHE, "logs", "treinar_{}_{}.log".format(inst, nome)))
     if codigo and gravado_desde(pasta, t0):

@@ -23,8 +23,8 @@ Detalhes:
     intercalam, então todo frame tem a sua probabilidade.
   - entrada: atributos padronizados (média e desvio do treino), NaN vira 0, mais uma coluna 0/1 de
     "faltando" para cada atributo que às vezes falta.
-  - treino em janelas de JANELA passos sorteadas das cópias degradadas; previsão em janelas do mesmo
-    tamanho, com metade de sobreposição, ficando com o miolo de cada uma.
+  - treino em janelas de 256 passos (hiper "janela") sorteadas das cópias degradadas; previsão em
+    janelas do mesmo tamanho, com metade de sobreposição, ficando com o miolo de cada uma.
   - a previsão roda na CPU, mesmo que o treino tenha sido na GPU: a submissão sai igual em qualquer
     máquina.
 """
@@ -39,9 +39,14 @@ from .config import A, D, H
 
 PASSO = 2
 JANELA = 256
-HIPER = {"epocas": 10, "epocas_rapido": 5, "largura": 64, "lote": 32, "lr": 2e-3, "dropout": 0.1}
+HIPER = {"epocas": 10, "epocas_rapido": 5, "largura": 64, "lote": 32, "lr": 2e-3, "dropout": 0.1,
+         "janela": JANELA}
 # o que muda por tipo de rede (o --hiper ainda passa por cima)
-HIPER_TIPO = {"transformer": {"lr": 1e-3, "camadas": 3, "cabecas": 4}}
+# blocos: blocos da TCN, com dilatação 1, 2, 4, ...; cada um soma 4 x dilatação passos ao alcance
+# (6 blocos: ~±10 s; 4: ~±2,5 s; 7: ~±20 s, que pede janela de 512 passos). camadas: das recorrentes
+# e do transformer. janela: passos (a 12,5 Hz) de cada trecho de treino e de previsão.
+HIPER_TIPO = {"transformer": {"lr": 1e-3, "camadas": 3, "cabecas": 4}, "tcn": {"blocos": 6},
+              "gru": {"camadas": 2}, "lstm": {"camadas": 2}}
 
 
 def hiper_de(tipo, hiper=None):
@@ -62,7 +67,7 @@ def _rede(tipo, d_in, h):
     nn = torch.nn
     F = torch.nn.functional
     RECORRENTES = {"gru": nn.GRU, "lstm": nn.LSTM}
-    largura, dropout = int(h["largura"]), float(h["dropout"])
+    largura, dropout, janela = int(h["largura"]), float(h["dropout"]), int(h["janela"])
 
     class BlocoTCN(nn.Module):
         def __init__(self, c, dilatacao):
@@ -77,19 +82,19 @@ def _rede(tipo, d_in, h):
 
     class Atencao(nn.Module):
         """Atenção multi-cabeça com viés de posição relativa: um número aprendido por cabeça para cada
-        distância entre dois frames (até ±JANELA), somado ao placar da atenção."""
+        distância entre dois frames (até ±janela), somado ao placar da atenção."""
         def __init__(self, d, cabecas):
             super().__init__()
             self.cabecas = cabecas
             self.qkv = nn.Linear(d, 3 * d)
             self.sai = nn.Linear(d, d)
-            self.vies = nn.Parameter(torch.zeros(cabecas, 2 * JANELA - 1))
+            self.vies = nn.Parameter(torch.zeros(cabecas, 2 * janela - 1))
 
         def forward(self, x):                      # (B, T, d)
             b, t, d = x.shape
             q, k, v = self.qkv(x).view(b, t, 3, self.cabecas, d // self.cabecas).permute(2, 0, 3, 1, 4)
             i = torch.arange(t, device=x.device)
-            rel = (i[None, :] - i[:, None]).clamp(-(JANELA - 1), JANELA - 1) + JANELA - 1
+            rel = (i[None, :] - i[:, None]).clamp(-(janela - 1), janela - 1) + janela - 1
             y = F.scaled_dot_product_attention(q, k, v, attn_mask=self.vies[:, rel][None],
                                                dropout_p=dropout if self.training else 0.0)
             return self.sai(y.transpose(1, 2).reshape(b, t, d))
@@ -122,14 +127,15 @@ def _rede(tipo, d_in, h):
             super().__init__()
             self.entrada = nn.Linear(d_in, largura)
             if tipo in RECORRENTES:
-                self.corpo = RECORRENTES[tipo](largura, largura, num_layers=2, batch_first=True,
-                                               bidirectional=True, dropout=dropout)
+                camadas = int(h["camadas"])
+                self.corpo = RECORRENTES[tipo](largura, largura, num_layers=camadas, batch_first=True,
+                                               bidirectional=True, dropout=dropout if camadas > 1 else 0.0)
                 saida = 2 * largura
             elif tipo == "transformer":
                 self.corpo = CorpoTransformer(largura)
                 saida = largura
             else:
-                self.corpo = nn.Sequential(*[BlocoTCN(largura, d) for d in (1, 2, 4, 8, 16, 32)])
+                self.corpo = nn.Sequential(*[BlocoTCN(largura, 2 ** i) for i in range(int(h["blocos"]))])
                 saida = largura
             self.saida = nn.Linear(saida, 3)
 
@@ -191,28 +197,30 @@ def _alvos(rot, prox):
 class ModeloSequencia:
     def __init__(self, tipo, rede, norm, hiper):
         self.tipo, self.rede, self.norm, self.hiper = tipo, rede, norm, hiper
+        self.janela = int(hiper_de(tipo, hiper)["janela"])
 
     def _logits(self, z):
-        """Logits (T, 3) de uma sequência inteira, em janelas de JANELA com metade de sobreposição.
-        De cada janela fica o miolo (sem o primeiro e o último quarto), que é onde a rede vê contexto
+        """Logits (T, 3) de uma sequência inteira, em janelas de self.janela passos com metade de
+        sobreposição. De cada janela fica o miolo (sem o primeiro e o último quarto), que é onde a rede vê contexto
         dos dois lados; nas pontas da sequência fica a ponta também."""
         torch = _torch()
+        J = self.janela
         t = len(z)
-        if t <= JANELA:
+        if t <= J:
             return self.rede(torch.from_numpy(z[None])).numpy()[0]
-        inicios = list(range(0, t - JANELA + 1, JANELA // 2))
-        if inicios[-1] + JANELA < t:
-            inicios.append(t - JANELA)
+        inicios = list(range(0, t - J + 1, J // 2))
+        if inicios[-1] + J < t:
+            inicios.append(t - J)
         soma = np.zeros((t, 3))
         peso = np.zeros(t)
-        meio = JANELA // 4
+        meio = J // 4
         for k in range(0, len(inicios), 64):
             grupo = inicios[k:k + 64]
-            lote = np.stack([z[s:s + JANELA] for s in grupo])
+            lote = np.stack([z[s:s + J] for s in grupo])
             lg = self.rede(torch.from_numpy(lote)).numpy()
             for j, s in enumerate(grupo):
                 lo = s + (0 if s == 0 else meio)
-                hi = s + JANELA - (0 if s + JANELA == t else meio)
+                hi = s + J - (0 if s + J == t else meio)
                 soma[lo:hi] += lg[j, lo - s:hi - s]
                 peso[lo:hi] += 1
         return soma / np.maximum(peso, 1)[:, None]
@@ -238,7 +246,7 @@ class ModeloSequencia:
         np.savez(os.path.join(pasta, "normalizacao.npz"), media=self.norm.media, desvio=self.norm.desvio,
                  com_falta=self.norm.com_falta)
         with open(os.path.join(pasta, "rede.json"), "w", encoding="utf-8") as arq:
-            json.dump({"tipo": self.tipo, "hiper": self.hiper, "passo": PASSO, "janela": JANELA}, arq, indent=1)
+            json.dump({"tipo": self.tipo, "hiper": self.hiper, "passo": PASSO, "janela": self.janela}, arq, indent=1)
 
 
 def carregar(pasta):
@@ -293,7 +301,8 @@ def treinar(caminhos, tipo, semente=0, hiper=None, dispositivo="cpu", rapido=Fal
     norm = Normalizador.ajustar([ler_npz(c)["x"] for c in caminhos[:4]], rng)
     seqs = _sequencias(caminhos, norm)
     tamanhos = np.array([len(s[0]) for s in seqs], dtype=np.float64)
-    passos_por_epoca = max(1, int(tamanhos.sum() // JANELA // h["lote"]))
+    J = int(h["janela"])
+    passos_por_epoca = max(1, int(tamanhos.sum() // J // h["lote"]))
 
     rede = _rede(tipo, norm.d_entrada, h).to(dispositivo)
     otim = torch.optim.AdamW(rede.parameters(), lr=float(h["lr"]), weight_decay=1e-4)
@@ -309,9 +318,9 @@ def treinar(caminhos, tipo, semente=0, hiper=None, dispositivo="cpu", rapido=Fal
             xs, ys, ms = [], [], []
             for i in lote:
                 z, alvo, mascara = seqs[i]
-                s = int(rng.integers(0, max(len(z) - JANELA, 0) + 1))
-                e = min(s + JANELA, len(z))
-                pad = JANELA - (e - s)
+                s = int(rng.integers(0, max(len(z) - J, 0) + 1))
+                e = min(s + J, len(z))
+                pad = J - (e - s)
                 xs.append(np.pad(z[s:e].astype(np.float32), ((0, pad), (0, 0))))
                 ys.append(np.pad(alvo[:, s:e], ((0, 0), (0, pad))))
                 ms.append(np.pad(mascara[:, s:e], ((0, 0), (0, pad))))

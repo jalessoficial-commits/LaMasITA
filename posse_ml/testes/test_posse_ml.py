@@ -274,6 +274,16 @@ class OutrosClassificadores(unittest.TestCase):
                     pasta = os.path.join(d, clf)
                     modelos.salvar(rede, os.path.join(pasta, "conjuntos", "um"), nomes, classificador=clf)
                     np.testing.assert_allclose(modelos.probabilidades(x, nomes, pasta, p.tempos)[1], ph, rtol=1e-5)
+            # outras configurações: alcance da TCN, janela, camadas da LSTM
+            for clf, hiper in (("tcn", {"epocas": 2, "blocos": 4, "janela": 128}),
+                               ("lstm", {"epocas": 2, "camadas": 1, "largura": 32})):
+                with self.subTest(clf=clf, hiper=hiper):
+                    rede = sequencia.treinar([caminho], clf, hiper=hiper)
+                    self.assertEqual(rede.janela, hiper.get("janela", sequencia.JANELA))
+                    ph = modelos.prever(rede, x, p.tempos)[1]
+                    pasta = os.path.join(d, clf + "_cfg")
+                    modelos.salvar(rede, os.path.join(pasta, "conjuntos", "um"), nomes, classificador=clf)
+                    np.testing.assert_allclose(modelos.probabilidades(x, nomes, pasta, p.tempos)[1], ph, rtol=1e-5)
 
 
 class Transmissao(unittest.TestCase):

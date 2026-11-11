@@ -258,48 +258,26 @@ classificador (`<clf>_sementes`) é validada na DFL e gravada como uma combinaç
 e para a média sai a validação na DFL, as três versões na janela e o teto (bola morta do GT, sem
 gravar arquivo). A tabela fica em `modelos/<instância>/sementes.md`. Na GPU, ~5 min por semente.
 
-**Testar variantes das redes** (número de épocas, a LSTM e o transformer):
+**Testar variantes das redes** (o número de épocas da TCN, a LSTM e o transformer):
 
 ```powershell
-python -m posse_ml.testar_variantes                       # todas; treina só as que faltam
-python -m posse_ml.testar_variantes --variantes tcn_e5 lstm_e5 lstm_e20
+python -m posse_ml.testar_variantes                       # lstm, tcn_e10, tcn_e20, tcn_e30, transformer
+python -m posse_ml.testar_variantes --variantes tcn_e20 lstm
 python -m posse_ml.testar_variantes --so-comparar
 ```
 
 | variante | o que muda | épocas (validação / final) |
 |---|---|---|
 | `lstm` | LSTM no lugar da GRU, mesma configuração | 5 / 10 |
-| `lstm_e5` | LSTM com 5 épocas | 5 / 5 |
-| `lstm_e20` | LSTM com 20 épocas | 20 / 20 |
-| `tcn_e5` | TCN com 5 épocas | 5 / 5 |
 | `tcn_e10` | nada no modelo final; a validação usa as mesmas 10 épocas (a `tcn` padrão valida com 5) | 10 / 10 |
 | `tcn_e20` | 20 épocas | 20 / 20 |
 | `tcn_e30` | 30 épocas | 30 / 30 |
 | `transformer` | o transformer, configuração padrão | 5 / 10 |
 
 A `tcn` e a `gru` que já existem entram como referência, sem treinar de novo. Saem a validação na
-DFL, as três versões na janela, o teto e duas medidas por frame na janela, tiradas do modelo antes
-do Viterbi: acerto de bola morta/viva e acerto de H/A com a bola viva. São ~7.500 frames em vez de 17
-posses, então oscilam bem menos que o spellF1 (mas frames vizinhos não são independentes). A tabela
-fica em `modelos/<instância>/variantes.md`. Na GPU, ~15 min por variante de 5 a 10 épocas e ~30 a
-40 min para 20 ou 30.
-
-**Testar épocas com várias sementes** (validação sempre com 5 épocas; muda só o modelo final):
-
-```powershell
-python -m posse_ml.testar_epocas                      # lstm, transformer e tcn; 5, 10 e 20 épocas; sementes 0, 1 e 2
-python -m posse_ml.testar_epocas --classificadores tcn --epocas 5 10 --sementes 0 1
-python -m posse_ml.testar_epocas --sementes 10 11 12       # sementes novas, sem reaproveitar nada
-python -m posse_ml.testar_epocas --so-comparar
-```
-
-Os modelos ficam em `modelos/<instância>/<rede>_f<N>[_s<semente>]`; os de 10 épocas usam os nomes do
-`testar_sementes` (`tcn`, `tcn_s1`...) e são reaproveitados quando já existem. A validação de uma
-semente é a mesma para todas as épocas e sai uma vez só (do cache, quando já existe), então a DFL não
-separa as épocas: quem compara é a janela, com a média das sementes, e as medidas por frame. A
-tabela traz, para cada rede e número de épocas, o valor de cada semente e a média deles, e fica em
-`modelos/<instância>/epocas.md`. As 27 combinações levam ~3 horas na GPU, a maior parte nas de 20
-épocas; o que já existe é pulado, e o comando pode ser repetido se for interrompido.
+DFL, as três versões na janela e o teto, e a tabela fica em `modelos/<instância>/variantes.md`. Uma
+variante só vale se passar a referência na DFL por mais do que a diferença entre sementes. Na GPU,
+~30 a 40 minutos para as quatro da TCN e a LSTM, mais uns 5 para o transformer.
 
 Um classificador só, passo a passo:
 
@@ -339,7 +317,6 @@ submissão leva poucos minutos com o ATD já no cache.
 | `posse_ml.calibrar` | `--instancia`, `--classificador`, `--paradas CSV`, `--sem-transmissao` |
 | `posse_ml.comparar_classificadores` | `--instancia`, `--classificadores`, `--so-comparar`, `--retreinar`, `--completo`, `--sem-gpu`, `--paradas CSV` |
 | `posse_ml.combinar` | `--instancia`, `--classificadores` (também `tcn_s1` etc.), `--so-validacao`, `--paradas CSV` |
-| `posse_ml.testar_epocas` | `--instancia`, `--classificadores`, `--epocas`, `--sementes`, `--so-comparar`, `--sem-gpu`, `--paradas CSV` |
 | `posse_ml.testar_variantes` | `--instancia`, `--variantes`, `--so-comparar`, `--sem-gpu`, `--paradas CSV` |
 | `posse_ml.testar_sementes` | `--instancia`, `--classificadores`, `--sementes`, `--so-comparar`, `--completo`, `--sem-gpu`, `--paradas CSV` |
 | `posse_ml.comparar_bolas` | nenhum |
@@ -613,147 +590,45 @@ mesmas. `<rede>_sementes` é a média das três, validada na DFL com os custos e
   a de GRU com TCN não ajudou porque as duas erram nos mesmos lances. A da GRU fica igual às
   sementes (0,614).
 
-### 5.10 Épocas e transformer (`testar_variantes`)
-
-A `tcn` de referência e a `tcn_e10` têm o mesmo modelo final (10 épocas, semente 0); muda só a
-validação, que escolhe os custos do Viterbi.
-
-| | épocas (validação / final) | custo de troca | DFL | janela, rígido | janela, suave | teto | posses (suave) | morta/viva por frame, só o modelo |
-|---|---|---|---|---|---|---|---|---|
-| `tcn` | 5 / 10 | 6 | 0,609 / 0,913 | 0,727 / 0,933 | 0,729 / 0,948 | 0,729 | 17 | 0,935 |
-| `tcn_e10` | 10 / 10 | 9 | 0,633 / 0,918 | 0,671 / 0,936 | 0,675 / 0,951 | 0,675 | 15 | 0,935 |
-| `tcn_e20` | 20 / 20 | 6 | 0,658 / 0,926 | 0,619 / 0,924 | 0,613 / 0,939 | 0,625 | 15 | 0,919 |
-| `tcn_e30` | 30 / 30 | 6 | **0,661 / 0,926** | 0,594 / 0,919 | 0,613 / 0,934 | 0,613 | 15 | 0,909 |
-| `lstm` | 5 / 10 | 6 | 0,619 / 0,915 | **0,727** / 0,931 | 0,715 / 0,944 | 0,715 | 16 | 0,928 |
-| `transformer` | 5 / 10 | 6 | 0,595 / 0,910 | 0,700 / **0,944** | 0,713 / **0,955** | 0,725 | 15 | 0,916 |
-
-- **A validação rápida subestimava as redes.** A mesma rede final dá 0,609 validada com 5 épocas e
-  0,633 com 10: os números de DFL das redes nas seções 5.6 a 5.9 estão ~0,025 abaixo do modelo de
-  verdade (entre as redes a comparação é justa; contra as árvores, a distância é maior do que
-  parecia).
-- **O custo de troca pesa muito na janela.** Com a mesma rede, troca 6 dá 17 posses e 0,729; troca
-  9, 15 posses e 0,675. Todos os modelos preveem posses de menos (12 a 16 contra 17 na janela, 70 a
-  80% na DFL), e a regra do platô escolhe de propósito a troca mais cara.
-- **Mais épocas: a DFL sobe, o nosso jogo cai.** 20 épocas ganha de 10 nos 7 jogos da DFL (+0,017 a
-  +0,036); 30 não acrescenta. Na janela, 20 e 30 caem para ~0,61, o teto cai junto, e o acerto de
-  bola morta por frame, que é bem menos ruidoso que o spellF1, cai a cada época a mais (0,935, 0,919,
-  0,909). A explicação provável: treinando mais, a rede aprende detalhes da DFL (liga, rótulo,
-  degradação imitada) que não valem no nosso jogo; a validação também é DFL e premia isso. Parar
-  cedo protege. Para épocas, a DFL não decide sozinha.
-- **O transformer é o mais fraco das redes na DFL e vai bem no nosso jogo.** Na DFL fica em 0,595,
-  0,015 a 0,025 abaixo das outras redes e empatado com as árvores (transformer precisa de mais dado
-  que 7 jogos). Na janela, 0,700 a 0,713, perto da TCN e da LSTM, com o melhor macroF1 de todos
-  (0,955 na suave, 0,974 no teto) e as bordas de começo de parada mais perto do GT. É a segunda vez
-  que a DFL e o nosso jogo discordam: uma leitura possível é que o modelo que se ajusta menos à DFL
-  transfere melhor. Uma semente só.
-- **A LSTM é a única sem conflito entre as duas réguas:** a melhor das redes validadas com 5 épocas
-  na DFL (0,619) e 0,715 a 0,727 na janela. Uma semente só.
-- As variantes `tcn_e5`, `lstm_e5` e `lstm_e20` existem no `testar_variantes`, mas o teste que vale
-  para épocas passou a ser o `testar_epocas` (seção 6), com 3 sementes por configuração.
-
-### 5.11 Épocas com sementes novas (`testar_epocas --sementes 10 11 12`)
-
-LSTM, transformer e TCN com 5, 10 e 20 épocas no modelo final, 3 sementes novas cada (27 modelos),
-custos do Viterbi sempre da validação de 5 épocas. Média das 3 sementes (e o valor de cada uma):
-
-| rede | épocas | DFL | janela, rígido | janela, suave | teto | morta/viva por frame | H/A por frame |
-|---|---|---|---|---|---|---|---|
-| **tcn** | **5** | **0,618** | **0,728** (0,729 / 0,727 / 0,727) | **0,733** | **0,749** | 0,933 | 0,953 |
-| tcn | 10 | 0,618 | 0,698 (0,671 / 0,684 / 0,739) | 0,693 | 0,709 | 0,920 | 0,952 |
-| tcn | 20 | 0,618 | 0,636 (0,606 / 0,645 / 0,658) | 0,645 | 0,645 | 0,912 | 0,948 |
-| lstm | 5 | 0,615 | 0,717 (0,741 / 0,706 / 0,703) | 0,718 | 0,737 | 0,934 | 0,953 |
-| lstm | 10 | 0,615 | 0,695 (0,707 / 0,693 / 0,684) | 0,709 | 0,714 | 0,923 | 0,951 |
-| lstm | 20 | 0,615 | 0,691 (0,676 / 0,710 / 0,688) | 0,710 | 0,714 | 0,931 | 0,944 |
-| transformer | 5 | 0,593 | 0,658 (0,688 / 0,637 / 0,648) | 0,674 | 0,680 | 0,919 | 0,954 |
-| transformer | 10 | 0,593 | 0,687 (0,688 / 0,671 / 0,703) | 0,698 | 0,703 | 0,926 | 0,955 |
-| transformer | 20 | 0,593 | 0,684 (0,693 / 0,671 / 0,688) | 0,699 | 0,710 | 0,930 | 0,950 |
-
-A DFL é a mesma para as três épocas da mesma rede (a validação é sempre de 5 épocas); quem compara
-as épocas é a janela. Tabela completa, modelo a modelo, em `modelos/viterbi/epocas.md`.
-
-Regra combinada antes de ver o resultado: média do spellF1 no rígido; diferença menor que 0,03 é
-empate, desempatado pelo macroF1; as medidas por frame conferem.
-
-- **TCN com 5 épocas é a campeã.** 0,728 no rígido contra 0,717 da LSTM com 5: pela regra, empate
-  técnico, e o macroF1 também empata (0,937 e 0,937). Mas a TCN-5 fica à frente no suave, no teto, na
-  bola morta própria e na DFL, e é de longe a mais estável: 0,729 / 0,727 / 0,727 nas três sementes,
-  todas com 16 ou 17 posses (GT 17), contra 0,703 a 0,741 da LSTM-5.
-- **Treinar menos é melhor no nosso jogo para TCN e LSTM.** A TCN cai a cada época a mais (0,728,
-  0,698, 0,636), com o acerto de bola morta por frame caindo junto (0,933, 0,920, 0,912), como na
-  seção 5.10. A LSTM tem o melhor resultado com 5 e fica estável depois.
-- **O transformer é a exceção:** com 5 épocas ainda não aprendeu o bastante (0,658) e melhora com 10
-  (0,687); aprende mais devagar, como a pesquisa dizia. Fica abaixo das outras duas.
-- **Com 5 épocas, DFL e janela concordam** (TCN ≥ LSTM > transformer nas duas). É também a única
-  configuração em que a rede validada é exatamente a rede enviada, e os custos do Viterbi foram
-  escolhidos para ela.
-- **O 0,729 da antiga TCN semente 0 não era só sorte:** é o nível típico da TCN de 5 épocas; aquela
-  rede tinha 10 épocas, mas os custos vinham da validação de 5.
-
 ## 6. Estado atual e próximos passos
 
-**Candidatas: TCN e LSTM, as duas com 5 épocas** (validação e modelo final com 5 épocas), com o
-detector de paradas. O transformer está descartado.
+Três candidatas, todas da instância `viterbi` com a bola morta do detector de paradas, cada uma por
+um motivo:
 
-| candidata | modelos | janela, rígido (média das 3 sementes) | janela, suave | DFL |
+| candidata | por que | janela, suave | janela, rígido | DFL |
 |---|---|---|---|---|
-| **TCN, 5 épocas** (à frente) | `tcn_f5_s10`, `tcn_f5_s11`, `tcn_f5_s12` | **0,728** (0,729 / 0,727 / 0,727) / 0,937 | **0,733** / 0,953 | **0,618** |
-| LSTM, 5 épocas | `lstm_f5_s10`, `lstm_f5_s11`, `lstm_f5_s12` | 0,717 (0,741 / 0,706 / 0,703) / 0,937 | 0,718 / 0,953 | 0,615 |
+| TCN semente 0 (`tcn`) | a melhor na janela, o único pedaço do jogo de verdade | 0,729 / 0,948 | 0,727 / 0,933 | 0,609 |
+| média das 3 TCN (`tcn_sementes`) | a melhor na DFL e a mais estável | 0,675 / 0,951 | 0,671 / 0,936 | **0,616** |
+| HistGradientBoosting (`hgb`) | a referência das árvores, a mais simples | 0,690 / 0,940 | 0,690 / 0,931 | 0,596 |
 
-Pela regra combinada (seção 5.11), as duas empatam: diferença de 0,011 no rígido, menor que 0,03, e
-o mesmo macroF1. A TCN fica à frente em todas as outras colunas e é bem mais estável entre sementes.
+Arquivos: `posse_ml_viterbi_tcn_nuno_{suave,rigido}.csv`, `posse_ml_viterbi_tcn_sementes_nuno_{suave,rigido}.csv`
+e `posse_ml_viterbi_nuno_{suave,rigido}.csv` (em `evaluation\experimentos` se a pasta de resultados
+foi limpa, seção 4).
 
-Para gerar a submissão de cada uma, a média das três sementes:
+Entre elas, as evidências puxam para lados diferentes:
 
-```powershell
-$env:POSSE_ML_RESULTADOS = "$PWD\evaluation\experimentos"
-py -3.13 -m posse_ml.combinar --classificadores tcn_f5_s10 tcn_f5_s11 tcn_f5_s12
-py -3.13 -m posse_ml.combinar --classificadores lstm_f5_s10 lstm_f5_s11 lstm_f5_s12
-```
+- **A janela** é o jogo de verdade, mas tem 17 posses: as diferenças entre as três (0,675 a 0,729)
+  são de 1 ou 2 posses. As outras sementes da TCN deram 0,675 e 0,693, o que mostra o quanto a
+  janela oscila só pelo sorteio da rede (seção 5.9).
+- **A DFL** tem 7 jogos inteiros, mas é uma imitação degradada do nosso tracker. Nela, todas as
+  redes ganham de todas as árvores, e a média das sementes ganha de cada semente.
+- Pela DFL, a aposta é a média das sementes; pela janela, a TCN semente 0. O que resolveria é mais
+  GT do nosso jogo: rotular à mão mais 10 a 15 minutos do vídeo (só para avaliar, nunca para
+  treinar) daria 30 a 50 posses a mais para comparar as três.
 
-Gravam `posse_ml_viterbi_<rede>_f5_s10+<rede>_f5_s11+<rede>_f5_s12_nuno_{rigido,suave}.csv` (e a
-própria). Falta escolher entre rígido (nada ajustado na janela) e suave (pesos ajustados na janela),
-o que depende de saber como o detector de paradas foi ajustado.
+Pendências:
 
-Descartados, e por quê:
-
-| | janela, rígido | motivo |
-|---|---|---|
-| transformer (5, 10 e 20 épocas) | 0,658 a 0,687 | abaixo da TCN e da LSTM nas duas réguas; precisa de mais dados que os 7 jogos da DFL |
-| TCN e LSTM com 10 ou 20 épocas | 0,636 a 0,698 | treinar mais piora no nosso jogo (seções 5.10 e 5.11) |
-| TCN semente 0 de 10 épocas (`tcn`) e a média das TCN de 10 épocas | 0,727 e 0,671 | 10 épocas; a TCN-5 dá o mesmo nível com as três sementes |
-| GRU | 0,640 a 0,679 | abaixo da LSTM, que é a mesma ideia |
-| árvores (HGB, XGBoost, LightGBM, CatBoost) | 0,690 | as redes ganham delas nas duas réguas |
-
-### Próximos passos
-
-1. **Menos "épocas" nas árvores.** Até aqui foram testados 4 tipos de árvore (HGB, XGBoost,
-   LightGBM, CatBoost), mas cada um com uma configuração só (400 árvores, 63 folhas); nunca se
-   variou isso. O equivalente a treinar menos nas árvores é ter menos árvores e árvores mais rasas.
-   Testar o HGB com, por exemplo, 50, 150 e 400 árvores e 15 ou 63 folhas, com a validação usando o
-   mesmo número de árvores do modelo final (hoje a validação rápida usa 150 e o modelo final 400,
-   o mesmo descompasso que atrapalhou as redes). Árvore não depende de semente: uma rodada por
-   configuração basta.
-2. **Menos épocas na TCN e na LSTM:** 1, 2 e 3 épocas, com as sementes 10, 11 e 12 (as de 5 já
-   existem). A decidir: validar com o mesmo número de épocas do modelo final (como na TCN-5
-   campeã, em que a rede validada é a enviada) ou sempre com 5 (como na rodada da seção 5.11). A
-   primeira isola melhor o efeito das épocas.
-3. **Outras configurações da TCN e da LSTM**, com o número de épocas que sair do passo 2: largura
-   (64 hoje; 32 e 128), profundidade (TCN: 6 blocos, alcance de ~10 s para cada lado; testar 4 e 8
-   blocos, ~2,5 e ~40 s; LSTM: 2 camadas; testar 1 e 3), dropout (0,1 hoje; 0,3, que também protege
-   contra a especialização na DFL) e o tamanho da janela de treino (~20 s). Sempre com 3 sementes e
-   pela mesma regra da seção 5.11.
-4. **Gerar as submissões das candidatas** (comandos acima), conferir no `run_evaluation` e no viewer,
-   e decidir entre rígido e suave.
-5. **Mais GT do nosso jogo**, só para avaliar. O viewer já rotula posse por bloco (painel Rotular,
-   "novo bloco aqui", teclas H / A / D), e `analise/rotular_paradas.gt_blocos(N)` transforma os blocos
-   num gabarito no formato oficial. Mais 15 minutos dariam ~50 posses e decidiriam entre TCN e LSTM.
-6. **Posses de menos.** As candidatas acertam o número de posses na janela (16 e 17), mas na DFL
-   todos os modelos ainda preveem 70 a 80% das reais. Rever a regra que escolhe os custos do Viterbi
-   (hoje, a troca mais cara dentro do empate) sem ajustar nada na janela.
-7. **Saber se o detector de paradas foi ajustado olhando a janela pública** (decide rígido ou
-   suave), e conferir as **bordas das trocas** no viewer.
-
-Prazo do desafio: 17/11/2026.
+1. **Variantes das redes** (`python -m posse_ml.testar_variantes`): o transformer, a LSTM e a TCN com
+   mais épocas (a perda ainda caía na época 10), todas com a semente 0. Comparar com a `tcn_e10` na
+   DFL e com o ruído das sementes (~0,005). Se uma variante ganhar, treinar sementes dela e usar a
+   média (o `testar_sementes` já aceita `--classificadores transformer`; as variantes de épocas da
+   TCN ainda não). Profundidade, largura e alcance ficam para depois.
+2. **Mais GT do nosso jogo**, rotulado à mão, para decidir entre as três candidatas.
+3. **Bordas das trocas.** Abrir no viewer o GT e a candidata e ver se as trocas saem sempre cedo ou
+   tarde.
+4. **Saber se o detector de paradas foi ajustado olhando a janela pública.** Se foi, os números dele
+   na janela estão otimistas, e o rígido passa a ser a escolha mais segura.
+5. **Validação completa sem `--rapido`**, uma vez, para conferir se os custos escolhidos mudam.
 
 ## 7. Arquivos
 
@@ -775,7 +650,7 @@ posse_ml/
 ├─ __main__.py      python -m posse_ml: escreve a submissão
 ├─ baixar_dfl.py, medir_bola.py, treinar.py, calibrar.py, comparar_bolas.py, comparar_paradas.py,
 │  comparar_classificadores.py, combinar.py, testar_sementes.py,
-│  testar_variantes.py, testar_epocas.py
+│  testar_variantes.py
 ├─ modelos/<instância>/  perfil_bola.json, decodificador.json, calibracao.json, conjuntos/*/ (vão para o Git)
 │                   e uma subpasta por classificador além do hgb (modelos/viterbi/xgboost/, ...)
 └─ testes/          testes sem dados (unittest) e um ponta a ponta sintético
