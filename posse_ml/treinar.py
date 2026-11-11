@@ -30,7 +30,7 @@ from concurrent.futures import ProcessPoolExecutor
 
 import numpy as np
 
-from . import atributos, config, degradacao, dfl, modelos, perfil as P, viterbi
+from . import atributos, config, degradacao, dfl, metrica, modelos, perfil as P, viterbi
 from .config import X
 
 sys.path.insert(0, os.path.join(config.RAIZ, "evaluation"))
@@ -67,7 +67,7 @@ def preparar(args):
             continue
         t0 = time.time()
         if p is None:
-            p = dfl.carregar(jogo, pasta_dfl)
+            p = metrica.carregar(jogo) if metrica.eh_metrica(jogo) else dfl.carregar(jogo, pasta_dfl)
         base = dfl.inverter(p) if invertida else p
         q, par = degradacao.degradar(base, np.random.default_rng(semente), perf)
         x, nomes = atributos.matriz(q)
@@ -149,7 +149,9 @@ def config_validacao(passo, hiper, classificador, rapido, semente=0):
     à do treino, epocas_rapido=5). Assim, variantes que só mudam as épocas finais dividem a mesma
     validação."""
     hv = dict(hiper)
-    if rapido and classificador in modelos.ITERACOES:
+    # árvores: a validação rápida usa ARVORES_RAPIDO, a não ser que o número de árvores tenha sido
+    # dado no --hiper (aí a validação usa o mesmo número do modelo final)
+    if rapido and classificador in modelos.ITERACOES and modelos.ITERACOES[classificador] not in hv:
         hv[modelos.ITERACOES[classificador]] = ARVORES_RAPIDO
     if classificador in modelos.SEQUENCIAIS:
         if rapido and "epocas_rapido" in hv:
@@ -185,7 +187,9 @@ def main(argv=None):
                     help="treina os modelos finais com os custos do decodificador.json (ou os padrão)")
     ap.add_argument("--rapido", action="store_true", help="validação com {} árvores (ou menos épocas, nas "
                     "redes) e um frame a cada {}; os modelos finais não mudam".format(ARVORES_RAPIDO, PASSO_RAPIDO))
-    ap.add_argument("--jogos", nargs="*", help="IDs da DFL (padrão: todos em posse_ml/dfl)")
+    ap.add_argument("--jogos", nargs="*", help="IDs dos jogos (padrão: os de --dados)")
+    ap.add_argument("--dados", choices=("dfl", "metrica", "dfl+metrica"), default="dfl",
+                    help="jogos de treino: os da DFL (padrão), os 3 da Metrica (baixar_metrica.py) ou todos")
     config.argumento_instancia(ap)
     ap.add_argument("--perfil", help="padrão: modelos/<instância>/perfil_bola.json")
     ap.add_argument("--passo", type=int, default=PASSO)
@@ -217,9 +221,14 @@ def main(argv=None):
         print("AVISO: {} não existe; uso o perfil padrão, que não foi medido. Rode antes "
               "python -m posse_ml.medir_bola --instancia {}".format(args.perfil, args.instancia))
 
-    jogos = args.jogos or dfl.jogos(args.pasta_dfl)
+    # os da DFL sempre primeiro e na mesma ordem: a semente de cada cópia depende da posição do jogo
+    jogos = args.jogos or ((dfl.jogos(args.pasta_dfl) if "dfl" in args.dados else []) +
+                           (metrica.jogos() if "metrica" in args.dados else []))
+    if "metrica" in args.dados and not metrica.jogos():
+        sys.exit("não achei os jogos da Metrica em {} (python -m posse_ml.baixar_metrica)".format(config.METRICA))
     if len(jogos) < 2:
-        sys.exit("preciso de pelo menos 2 jogos da DFL em {} (python -m posse_ml.baixar_dfl)".format(args.pasta_dfl))
+        sys.exit("preciso de pelo menos 2 jogos de treino (python -m posse_ml.baixar_dfl ou baixar_metrica)")
+    print("jogos de treino ({}): {}".format(len(jogos), " ".join(jogos)))
     tarefas = [(j, i, 100000 * args.semente, perf, args.pasta_dfl) for i, j in enumerate(jogos)]
     t0 = time.time()
     print("preparando as cópias degradadas ({} jogos x {}); as que já estão no cache são puladas".format(

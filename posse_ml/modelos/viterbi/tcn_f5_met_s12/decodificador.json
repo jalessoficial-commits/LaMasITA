@@ -1,0 +1,18 @@
+{
+ "custos": {
+  "troca": 13.0,
+  "parada": 12.0,
+  "reinicio": 1.0
+ },
+ "spellF1_validacao": 0.7211,
+ "macroF1_validacao": 0.9111,
+ "jogos": [
+  "MET1",
+  "MET2",
+  "MET3"
+ ],
+ "rapido": true,
+ "classificador": "tcn",
+ "semente": 0,
+ "chave_validacao": "394e4d16"
+}

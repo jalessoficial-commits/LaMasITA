@@ -69,6 +69,8 @@ def argumento_instancia(ap):
                     help="qual bola: viterbi (padrão), fusao ou atd. Define a bola, a pasta "
                          "modelos/<instância> e o nome da submissão; --bola e --modelos mudam só um deles")
 DFL = os.environ.get("POSSE_ML_DFL") or os.path.join(PASTA, "dfl")
+# os 3 jogos abertos da Metrica (baixar_metrica.py): Sample_Game_1, _2 e _3
+METRICA = os.environ.get("POSSE_ML_METRICA") or os.path.join(PASTA, "metrica_dados")
 GT_PUBLICO = os.environ.get("POSSE_ML_GT") or os.path.join(
     RAIZ, "evaluation", "gt", "BAR-ATH_possession_gt_public.csv")
 

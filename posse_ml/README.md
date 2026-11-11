@@ -290,6 +290,7 @@ fica em `modelos/<instância>/variantes.md`. Na GPU, ~15 min por variante de 5 a
 python -m posse_ml.testar_epocas                      # lstm, transformer e tcn; 5, 10 e 20 épocas; sementes 0, 1 e 2
 python -m posse_ml.testar_epocas --classificadores tcn --epocas 5 10 --sementes 0 1
 python -m posse_ml.testar_epocas --sementes 10 11 12       # sementes novas, sem reaproveitar nada
+python -m posse_ml.testar_epocas --classificadores tcn lstm --epocas 1 2 3 5 --sementes 10 11 12 --validacao igual
 python -m posse_ml.testar_epocas --so-comparar
 ```
 
@@ -298,8 +299,89 @@ Os modelos ficam em `modelos/<instância>/<rede>_f<N>[_s<semente>]`; os de 10 é
 semente é a mesma para todas as épocas e sai uma vez só (do cache, quando já existe), então a DFL não
 separa as épocas: quem compara é a janela, com a média das sementes, e as medidas por frame. A
 tabela traz, para cada rede e número de épocas, o valor de cada semente e a média deles, e fica em
-`modelos/<instância>/epocas.md`. As 27 combinações levam ~3 horas na GPU, a maior parte nas de 20
+`modelos/<instância>/epocas.md`. Com `--validacao igual`, a validação usa as mesmas épocas do modelo
+final (como na TCN-5 campeã), os modelos ficam em `<rede>_f<N>v<N>[_s<semente>]` (o de 5 épocas é o
+mesmo `<rede>_f5`, reaproveitado) e a tabela vai para `epocas_igual.md`. As 27 combinações levam ~3 horas na GPU, a maior parte nas de 20
 épocas; o que já existe é pulado, e o comando pode ser repetido se for interrompido.
+
+**Testar os dados de treino: só DFL, só Metrica, DFL + Metrica**
+
+```powershell
+python -m posse_ml.baixar_metrica      # uma vez, ~190 MB em posse_ml/metrica_dados
+python -m posse_ml.metrica             # confere os rótulos derivados ao lado do GT público
+python -m posse_ml.testar_dados        # tcn e lstm, 5 épocas, sementes 10 11 12
+python -m posse_ml.testar_dados --dados metrica --epocas 12       # só um treino, outro nº de épocas
+python -m posse_ml.testar_dados --dados dfl+metrica --epocas 3
+```
+
+Os 3 jogos abertos da Metrica (github.com/metrica-sports/sample-data) trazem rastreamento a 25 Hz
+e eventos anotados, mas não a posse frame a frame. Ela é derivada em `metrica.py`:
+
+- **bola morta:** a bola desses dados é reconstruída dos eventos (anda em linha reta nos passes,
+  nunca falta durante um evento) e some quando o jogo para; bola ausente por 1 s ou mais é `D`;
+- **posse:** o time do último evento com a bola (passe, condução, finalização, bola parada,
+  recuperação, perda); a perda continua com quem perdeu até o adversário recuperar;
+- **toque sem controle:** um trecho de menos de 2 s sem passe, finalização nem bola parada não
+  conta como posse. O limite de 2 s foi escolhido para a duração das posses ficar como no GT.
+
+| | bola morta | posses/min | duração média | mediana / 10% mais curtas |
+|---|---|---|---|---|
+| GT público (5 min) | 19,6% | 3,40 | 14,2 s | 7,6 s / 2,2 s |
+| MET1 | 37,7% | 3,13 | 12,0 s | 7,5 s / 2,2 s |
+| MET2 | 40,4% | 3,00 | 11,9 s | 7,1 s / 1,6 s |
+| MET3 | 31,6% | 3,30 | 12,4 s | 7,4 s / 1,9 s |
+
+Para comparar: a DFL tem ~5 posses por minuto, uma convenção mais picada que a do desafio. No treino
+(`treinar --dados metrica` ou `--dados dfl+metrica`), os jogos da Metrica passam pela mesma
+degradação da DFL: uma bola de parada sintética na bola morta e as falhas do perfil da nossa bola.
+O `testar_dados` treina, para cada rede e semente, os três casos com a mesma configuração e compara
+na janela pública (`modelos/<instância>/dados.md`); o caso "dfl" é o `<rede>_f5_s<semente>` que já
+existe. Limitações: os rótulos são derivados por regra, a bola é mais "limpa" que uma rastreada, e o
+limite de 2 s foi ajustado olhando a distribuição do GT público (só a duração das posses, não o
+placar).
+
+**Testar outras configurações da TCN e da LSTM** (com sementes; o número de épocas é livre):
+
+```powershell
+python -m posse_ml.testar_configs                                    # todas, 5 épocas, sementes 10 11 12
+python -m posse_ml.testar_configs --epocas 3                         # outro número de épocas
+python -m posse_ml.testar_configs --configs tcn_d03 lstm_c1 --epocas 3 5
+python -m posse_ml.testar_configs --so-comparar
+```
+
+| configuração | o que muda (o resto fica no padrão) |
+|---|---|
+| `tcn_d03`, `lstm_d03` | dropout 0,3 (padrão 0,1): regulariza, pode proteger da especialização na DFL |
+| `tcn_l32`, `lstm_l32` | largura 32 (padrão 64) |
+| `tcn_l128`, `lstm_l128` | largura 128 |
+| `tcn_b4` | 4 blocos: alcance de ~±2,5 s (padrão 6 blocos, ~±10 s) |
+| `tcn_b7` | 7 blocos e janela de 512 passos: alcance de ~±20 s |
+| `lstm_c1`, `lstm_c3` | 1 ou 3 camadas (padrão 2) |
+
+A validação usa as mesmas épocas do modelo final (`--validacao igual`, padrão; `--validacao 5` para
+sempre 5). Os modelos ficam em `modelos/<instância>/<config>_f<N>[v<N>]_s<semente>`, e a TCN e a
+LSTM padrão com as mesmas épocas e sementes (do `testar_epocas`) entram como referência. A tabela
+(média das sementes e o valor de cada uma) fica em `modelos/<instância>/configs.md`. As 10
+configurações com 3 sementes são 30 modelos, ~3 horas na GPU com 5 épocas.
+
+Essas opções também valem no `--hiper` do `treinar`: `largura`, `dropout`, `blocos` (TCN), `camadas`
+(GRU, LSTM, transformer) e `janela` (passos de cada trecho de treino e previsão, padrão 256 = ~20 s; o
+alcance da TCN não deve passar da janela).
+
+**Testar árvores com menos árvores e/ou mais rasas** (o equivalente a treinar menos):
+
+```powershell
+python -m posse_ml.testar_arvores                          # HGB: 50, 150 e 400 árvores x 15 e 63 folhas
+python -m posse_ml.testar_arvores --arvores 25 50 --folhas 7 15
+python -m posse_ml.testar_arvores --classificador xgboost  # também xgboost e lightgbm
+python -m posse_ml.testar_arvores --so-comparar
+```
+
+Cada configuração fica em `modelos/<instância>/<classificador>_a<árvores>_f<folhas>/`. A validação usa
+o mesmo número de árvores do modelo final (com `--hiper max_iter=N`, o `treinar --rapido` deixa de
+trocar por 150); continua rápida só em usar um frame a cada 4. Árvore não depende de semente: uma
+rodada por configuração. A configuração padrão entra como referência, e a tabela fica em
+`modelos/<instância>/arvores.md`.
 
 Um classificador só, passo a passo:
 
@@ -339,6 +421,9 @@ submissão leva poucos minutos com o ATD já no cache.
 | `posse_ml.calibrar` | `--instancia`, `--classificador`, `--paradas CSV`, `--sem-transmissao` |
 | `posse_ml.comparar_classificadores` | `--instancia`, `--classificadores`, `--so-comparar`, `--retreinar`, `--completo`, `--sem-gpu`, `--paradas CSV` |
 | `posse_ml.combinar` | `--instancia`, `--classificadores` (também `tcn_s1` etc.), `--so-validacao`, `--paradas CSV` |
+| `posse_ml.testar_dados` | `--instancia`, `--classificadores`, `--epocas`, `--sementes`, `--so-comparar`, `--sem-gpu`, `--paradas CSV` |
+| `posse_ml.testar_configs` | `--instancia`, `--configs`, `--epocas`, `--validacao igual\|5`, `--sementes`, `--so-comparar`, `--sem-gpu`, `--paradas CSV` |
+| `posse_ml.testar_arvores` | `--instancia`, `--classificador`, `--arvores`, `--folhas`, `--so-comparar`, `--sem-gpu`, `--paradas CSV` |
 | `posse_ml.testar_epocas` | `--instancia`, `--classificadores`, `--epocas`, `--sementes`, `--so-comparar`, `--sem-gpu`, `--paradas CSV` |
 | `posse_ml.testar_variantes` | `--instancia`, `--variantes`, `--so-comparar`, `--sem-gpu`, `--paradas CSV` |
 | `posse_ml.testar_sementes` | `--instancia`, `--classificadores`, `--sementes`, `--so-comparar`, `--completo`, `--sem-gpu`, `--paradas CSV` |
@@ -689,6 +774,118 @@ empate, desempatado pelo macroF1; as medidas por frame conferem.
 - **O 0,729 da antiga TCN semente 0 não era só sorte:** é o nível típico da TCN de 5 épocas; aquela
   rede tinha 10 épocas, mas os custos vinham da validação de 5.
 
+### 5.12 Árvores com menos árvores e mais rasas (`testar_arvores --classificador xgboost`)
+
+Validação com o mesmo número de árvores do modelo final; árvore não depende de semente.
+
+| XGBoost (árvores / folhas) | DFL | janela, rígido | janela, suave | teto | posses | morta/viva por frame | H/A por frame |
+|---|---|---|---|---|---|---|---|
+| 50 / 15 | 0,538 | 0,662 | 0,653 | 0,645 | 12 | 0,910 | 0,940 |
+| 150 / 15 | 0,574 | 0,662 | 0,662 | 0,680 | 12 | 0,913 | 0,942 |
+| 400 / 15 | 0,596 | 0,676 | 0,676 | 0,676 | 12 | 0,917 | 0,939 |
+| 50 / 63 | 0,562 | 0,648 | 0,648 | 0,648 | 12 | 0,902 | 0,946 |
+| 150 / 63 | 0,596 | 0,662 | 0,662 | 0,662 | 12 | 0,914 | 0,943 |
+| **400 / 63** | **0,603** | **0,690** | **0,690** | **0,690** | 12 | 0,915 | 0,943 |
+| referência (400 / 63, validada com 150) | 0,596 | 0,690 | 0,690 | 0,690 | 12 | 0,915 | 0,943 |
+
+- **Nas árvores, treinar menos piora as duas réguas.** As redes se especializavam demais na DFL; as
+  árvores aprendem de menos (a taxa 0,05 e o mínimo por folha já seguram bastante). A configuração
+  padrão continua a melhor.
+- **O limite é a família:** toda árvore prevê 12 posses na janela e nenhuma passa de 0,690, nem no
+  teto. Por frame, o H/A das árvores (~0,94) é quase o das redes (~0,95); o que as redes fazem a mais
+  é encadear os frames e achar as trocas de posse.
+- Validar com as mesmas 400 árvores deu 0,603 na DFL, contra 0,596 com 150; na janela, igual.
+
+### 5.13 Menos épocas (`testar_epocas --validacao igual`, sementes 10, 11 e 12)
+
+Validação com as mesmas épocas do modelo final. Média das 3 sementes:
+
+| rede | épocas | DFL | janela, rígido | janela, suave | teto | morta/viva por frame | H/A por frame |
+|---|---|---|---|---|---|---|---|
+| tcn | 1 | 0,536 | 0,648 | 0,648 | 0,648 | 0,938 | 0,944 |
+| tcn | 2 | 0,585 | 0,644 | 0,655 | 0,664 | 0,937 | 0,947 |
+| tcn | 3 | 0,600 | 0,689 | 0,688 | 0,711 | 0,939 | 0,950 |
+| **tcn** | **5** | **0,618** | **0,728** | **0,733** | **0,749** | 0,933 | 0,953 |
+| lstm | 1 | 0,519 | 0,636 | 0,645 | 0,650 | 0,921 | 0,942 |
+| lstm | 2 | 0,583 | 0,654 | 0,667 | 0,675 | 0,933 | 0,947 |
+| lstm | 3 | 0,599 | 0,675 | 0,685 | 0,693 | 0,934 | 0,949 |
+| lstm | 5 | 0,615 | 0,717 | 0,718 | 0,737 | 0,934 | 0,953 |
+
+Tabela completa, modelo a modelo, em `modelos/viterbi/epocas_igual.md`.
+
+- **Menos de 5 épocas piora as duas réguas,** nas duas redes: a rede ainda não aprendeu o bastante
+  (com 1 época, as três sementes da TCN dão exatamente 0,648, 12 posses: quase não troca de posse).
+- **Juntando com as seções 5.10 e 5.11, 5 épocas é o ponto certo:** na DFL a curva sobe até 20–30
+  épocas; na janela ela sobe até 5 e cai depois (TCN, rígido: 0,648, 0,644, 0,689, **0,728**, ~0,70
+  com 10, ~0,63 com 20). As duas réguas se cruzam em 5.
+
+### 5.14 Variação entre sementes (desvio padrão das 3 sementes)
+
+Média ± desvio padrão amostral das sementes 10, 11 e 12 (seções 5.11 e 5.13). Com 1, 2, 3 e 5
+épocas, a validação usa as mesmas épocas do modelo final; com 10 e 20, a validação é de 5 épocas.
+Janela: spellF1.
+
+| rede | épocas | DFL | janela, rígido | janela, suave | teto |
+|---|---|---|---|---|---|
+| tcn | 1 | 0,536 ± 0,003 | 0,648 ± 0,000 | 0,648 ± 0,000 | 0,648 ± 0,000 |
+| tcn | 2 | 0,585 ± 0,006 | 0,644 ± 0,016 | 0,655 ± 0,003 | 0,664 ± 0,005 |
+| tcn | 3 | 0,600 ± 0,007 | 0,689 ± 0,027 | 0,687 ± 0,028 | 0,711 ± 0,034 |
+| **tcn** | **5** | 0,618 ± 0,002 | **0,728 ± 0,001** | **0,733 ± 0,018** | **0,749 ± 0,014** |
+| tcn | 10 | 0,618 ± 0,002 | 0,698 ± 0,036 | 0,694 ± 0,022 | 0,710 ± 0,038 |
+| tcn | 20 | 0,618 ± 0,002 | 0,636 ± 0,027 | 0,645 ± 0,019 | 0,645 ± 0,019 |
+| lstm | 1 | 0,519 ± 0,005 | 0,636 ± 0,003 | 0,645 ± 0,019 | 0,649 ± 0,027 |
+| lstm | 2 | 0,583 ± 0,004 | 0,654 ± 0,040 | 0,667 ± 0,041 | 0,675 ± 0,046 |
+| lstm | 3 | 0,599 ± 0,005 | 0,675 ± 0,035 | 0,685 ± 0,032 | 0,692 ± 0,041 |
+| **lstm** | **5** | 0,615 ± 0,002 | **0,717 ± 0,021** | **0,718 ± 0,036** | **0,737 ± 0,036** |
+| lstm | 10 | 0,615 ± 0,002 | 0,695 ± 0,012 | 0,709 ± 0,030 | 0,714 ± 0,023 |
+| lstm | 20 | 0,615 ± 0,002 | 0,691 ± 0,017 | 0,710 ± 0,026 | 0,714 ± 0,030 |
+
+(Com 10 e 20 épocas, a DFL é a da validação de 5 épocas, a mesma das redes de 5.)
+
+- **Na janela, uma semente oscila em torno de 0,02 a 0,04** (desvio típico; ~1 posse das 17). É
+  por isso que a regra de escolha trata diferenças menores que 0,03 como empate. Na DFL, a
+  oscilação é bem menor (0,002 a 0,007).
+- **A TCN-5 no rígido é excepcionalmente estável** (0,729 / 0,727 / 0,727, desvio 0,001). No suave
+  e no teto o desvio dela volta ao normal (0,014 a 0,018), então parte dessa estabilidade é acaso
+  de ter só 3 sementes. A LSTM-5 oscila como as outras configurações (0,021 no rígido).
+- **O pico em 5 épocas é moderado em cada rede e firme no conjunto.** A diferença da TCN-5 para as
+  vizinhas (3 e 10 épocas) é de 0,03 a 0,04, uma a duas vezes o desvio entre sementes; com 3
+  sementes, o erro padrão de cada média é ~desvio/√3 ≈ 0,01 a 0,02. Sozinha, cada comparação seria
+  fraca; o que dá força é o mesmo pico aparecer nas duas redes, no rígido, no suave e no teto, e
+  bater com a TCN de 10 épocas das sementes 0, 1 e 2 (média 0,688, seção 5.9).
+- **Cuidado com o próprio desvio:** com 3 valores, ele é impreciso (pode errar pela metade para mais
+  ou para menos). Serve para a ordem de grandeza, não para comparar desvios entre si.
+
+### 5.15 Outras configurações (`testar_configs --epocas 5`, sementes 10, 11 e 12)
+
+Cada configuração muda uma coisa em relação à padrão (largura 64, dropout 0,1, TCN com 6 blocos,
+LSTM com 2 camadas); 5 épocas na validação e no modelo final. Ordenado pelo spellF1 no rígido, média
+± desvio padrão das 3 sementes:
+
+| # | configuração | janela, rígido | pior semente | janela, suave | teto | DFL |
+|---|---|---|---|---|---|---|
+| 1 | **TCN padrão** | **0,728 ± 0,001** | 0,727 | 0,733 | 0,749 | 0,618 |
+| 2 | TCN, dropout 0,3 | 0,720 ± 0,006 | 0,715 | 0,714 | 0,733 | 0,615 |
+| 3 | **LSTM padrão** | 0,717 ± 0,021 | 0,703 | 0,718 | 0,737 | 0,615 |
+| 4 | LSTM, 1 camada | 0,717 ± 0,020 | 0,694 | 0,718 | 0,733 | 0,615 |
+| 5 | LSTM, largura 128 | 0,716 ± 0,013 | 0,703 | 0,702 | 0,718 | 0,624 |
+| 6 | TCN, largura 128 | 0,708 ± 0,044 | 0,658 | 0,703 | 0,711 | 0,626 |
+| 7 | LSTM, 3 camadas | 0,697 ± 0,043 | 0,648 | 0,695 | 0,703 | 0,612 |
+| 8 | LSTM, dropout 0,3 | 0,688 ± 0,030 | 0,658 | 0,700 | 0,704 | 0,614 |
+| 9 | TCN, 7 blocos (~±20 s) | 0,685 ± 0,024 | 0,662 | 0,690 | 0,700 | 0,599 |
+| 10 | TCN, largura 32 | 0,684 ± 0,030 | 0,662 | 0,685 | 0,688 | 0,604 |
+| 11 | LSTM, largura 32 | 0,671 ± 0,023 | 0,648 | 0,675 | 0,676 | 0,606 |
+| 12 | TCN, 4 blocos (~±2,5 s) | 0,616 ± 0,012 | 0,606 | 0,616 | 0,627 | 0,607 |
+
+O macroF1 no rígido fica entre 0,935 e 0,940 em todas. Tabela completa em `modelos/viterbi/configs.md`.
+
+- **Nenhuma configuração passa a padrão.** As cinco primeiras estão dentro de 0,012 (empate pela
+  regra dos 0,03); em empate fica a padrão, a mais simples e a mais testada.
+- **Largura 128 melhora a DFL e não o nosso jogo** (e deixa a TCN instável entre sementes): o mesmo
+  padrão das épocas, mais capacidade ajuda na DFL e não transfere.
+- **O alcance da TCN importa:** ±2,5 s é o pior resultado de todos (0,616), ±20 s também piora;
+  ±10 s é o ponto certo. Redes menores (largura 32) pioram nas duas réguas.
+
 ## 6. Estado atual e próximos passos
 
 **Candidatas: TCN e LSTM, as duas com 5 épocas** (validação e modelo final com 5 épocas), com o
@@ -726,32 +923,37 @@ Descartados, e por quê:
 
 ### Próximos passos
 
-1. **Menos "épocas" nas árvores.** Até aqui foram testados 4 tipos de árvore (HGB, XGBoost,
-   LightGBM, CatBoost), mas cada um com uma configuração só (400 árvores, 63 folhas); nunca se
-   variou isso. O equivalente a treinar menos nas árvores é ter menos árvores e árvores mais rasas.
-   Testar o HGB com, por exemplo, 50, 150 e 400 árvores e 15 ou 63 folhas, com a validação usando o
-   mesmo número de árvores do modelo final (hoje a validação rápida usa 150 e o modelo final 400,
-   o mesmo descompasso que atrapalhou as redes). Árvore não depende de semente: uma rodada por
-   configuração basta.
-2. **Menos épocas na TCN e na LSTM:** 1, 2 e 3 épocas, com as sementes 10, 11 e 12 (as de 5 já
-   existem). A decidir: validar com o mesmo número de épocas do modelo final (como na TCN-5
-   campeã, em que a rede validada é a enviada) ou sempre com 5 (como na rodada da seção 5.11). A
-   primeira isola melhor o efeito das épocas.
-3. **Outras configurações da TCN e da LSTM**, com o número de épocas que sair do passo 2: largura
-   (64 hoje; 32 e 128), profundidade (TCN: 6 blocos, alcance de ~10 s para cada lado; testar 4 e 8
-   blocos, ~2,5 e ~40 s; LSTM: 2 camadas; testar 1 e 3), dropout (0,1 hoje; 0,3, que também protege
-   contra a especialização na DFL) e o tamanho da janela de treino (~20 s). Sempre com 3 sementes e
-   pela mesma regra da seção 5.11.
-4. **Gerar as submissões das candidatas** (comandos acima), conferir no `run_evaluation` e no viewer,
-   e decidir entre rígido e suave.
-5. **Mais GT do nosso jogo**, só para avaliar. O viewer já rotula posse por bloco (painel Rotular,
-   "novo bloco aqui", teclas H / A / D), e `analise/rotular_paradas.gt_blocos(N)` transforma os blocos
-   num gabarito no formato oficial. Mais 15 minutos dariam ~50 posses e decidiriam entre TCN e LSTM.
-6. **Posses de menos.** As candidatas acertam o número de posses na janela (16 e 17), mas na DFL
-   todos os modelos ainda preveem 70 a 80% das reais. Rever a regra que escolhe os custos do Viterbi
-   (hoje, a troca mais cara dentro do empate) sem ajustar nada na janela.
-7. **Saber se o detector de paradas foi ajustado olhando a janela pública** (decide rígido ou
-   suave), e conferir as **bordas das trocas** no viewer.
+Feitos: menos árvores (5.12), menos épocas (5.13), outras configurações (5.15). A configuração
+padrão com 5 épocas fica, na TCN e na LSTM. A validação é pela janela pública (os 5 minutos do GT):
+rotular mais GT à mão saiu do plano.
+
+| quando | o quê |
+|---|---|
+| qua 11/11 | **dados de treino** (`testar_dados`: só DFL, só Metrica, DFL + Metrica) e **confirmação em sementes novas** (`testar_epocas --classificadores tcn lstm --epocas 5 --sementes 10 11 12 20 21 22 --validacao igual`) |
+| qui 12/11 | fechar os dados de treino; **dois modelos finais** (TCN e LSTM), cada um a média das sementes (`combinar`); CSVs em `evaluation/results` e pesos no GitHub para o time |
+| sex 13/11 | **auditoria das regras** e teste de reprodução num clone limpo |
+| sáb 14 – dom 15/11 | **documento técnico** e limpeza do repositório |
+| seg 16/11 | revisão final, escolha do CSV (um por equipe) e **envio** |
+| ter 17/11 | folga (prazo) |
+
+Notas para esses passos:
+
+- **Épocas e dados de treino:** uma época é uma passada pelos dados; com só a Metrica (3 jogos), 5
+  épocas são menos da metade das atualizações de rede que com a DFL (7 jogos), e com DFL + Metrica,
+  ~40% a mais. Como o resultado é sensível às épocas, comparar também com o número de atualizações
+  igualado (~12 épocas para só Metrica, 3 ou 4 para DFL + Metrica).
+- **Modelo final = média das sementes, não uma semente.** Entre sementes da mesma configuração, a
+  qualidade real quase não muda (0,002 a 0,007 na DFL) e a sorte na janela muda 0,02 a 0,04:
+  escolher a semente campeã da janela é escolher pela sorte (a primeira TCN fez 0,729 e as duas
+  seguintes, 0,67). A média mantém o sinal comum e dilui os erros de cada rede.
+- **Rígido ou suave:** o detector de paradas foi desenvolvido olhando os 4 trechos de bola morta da
+  janela (sem otimização direta nela), e o suave ainda ajusta 4 pesos na janela; o rígido é a
+  escolha mais segura.
+- **Auditoria:** uso do GT público na calibração (pesos do suave; limite de 2 s dos rótulos da
+  Metrica), declaração dos dados externos (DFL, Metrica), o detector de paradas, repositório
+  público e reprodutível com os modelos finais, nomes dos arquivos.
+- **Posses de menos na DFL** (70 a 80% das reais): provavelmente é diferença de convenção (a DFL
+  tem ~5 posses por minuto; o GT, 3,4), não erro. Fica só como observação.
 
 Prazo do desafio: 17/11/2026.
 
@@ -775,7 +977,9 @@ posse_ml/
 ├─ __main__.py      python -m posse_ml: escreve a submissão
 ├─ baixar_dfl.py, medir_bola.py, treinar.py, calibrar.py, comparar_bolas.py, comparar_paradas.py,
 │  comparar_classificadores.py, combinar.py, testar_sementes.py,
-│  testar_variantes.py, testar_epocas.py
+│  testar_variantes.py, testar_epocas.py, testar_arvores.py,
+│  testar_configs.py, testar_dados.py
+├─ metrica.py, baixar_metrica.py   os 3 jogos abertos da Metrica e os rótulos derivados dos eventos
 ├─ modelos/<instância>/  perfil_bola.json, decodificador.json, calibracao.json, conjuntos/*/ (vão para o Git)
 │                   e uma subpasta por classificador além do hgb (modelos/viterbi/xgboost/, ...)
 └─ testes/          testes sem dados (unittest) e um ponta a ponta sintético

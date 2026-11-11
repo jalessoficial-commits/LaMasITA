@@ -1,0 +1,16 @@
+{
+ "tipo": "tcn",
+ "hiper": {
+  "epocas": 3,
+  "epocas_rapido": 3,
+  "largura": 64,
+  "lote": 32,
+  "lr": 0.002,
+  "dropout": 0.1,
+  "janela": 256,
+  "blocos": 6,
+  "semente": 10
+ },
+ "passo": 2,
+ "janela": 256
+}
