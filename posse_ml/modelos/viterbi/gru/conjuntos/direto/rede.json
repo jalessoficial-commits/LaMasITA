@@ -1,0 +1,13 @@
+{
+ "tipo": "gru",
+ "hiper": {
+  "epocas": 10,
+  "epocas_rapido": 5,
+  "largura": 64,
+  "lote": 32,
+  "lr": 0.002,
+  "dropout": 0.1
+ },
+ "passo": 2,
+ "janela": 256
+}

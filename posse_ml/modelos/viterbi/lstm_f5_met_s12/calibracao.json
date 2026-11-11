@@ -1,0 +1,12 @@
+{
+ "transmissao": {
+  "intercepto": 0.7461,
+  "modelo": 1.0187,
+  "outra_vista": -1.412,
+  "sem_campo": 2.3356
+ },
+ "adiantar": {
+  "inicio": 21,
+  "fim": 13
+ }
+}

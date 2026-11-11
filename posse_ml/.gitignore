@@ -1,0 +1,6 @@
+# derivado dos dados do jogo (arrays do ATD, cópias degradadas da DFL, probabilidades): não publicar
+cache/
+# jogos da DFL baixados pelo baixar_dfl.py (CC-BY, mas grandes)
+dfl/
+# jogos da Metrica baixados pelo baixar_metrica.py
+metrica_dados/

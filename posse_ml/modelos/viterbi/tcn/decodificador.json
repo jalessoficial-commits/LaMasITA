@@ -1,0 +1,20 @@
+{
+ "custos": {
+  "troca": 6.0,
+  "parada": 12.0,
+  "reinicio": 1.0
+ },
+ "spellF1_validacao": 0.6092,
+ "macroF1_validacao": 0.9129,
+ "jogos": [
+  "J03WMX",
+  "J03WN1",
+  "J03WOH",
+  "J03WOY",
+  "J03WPY",
+  "J03WQQ",
+  "J03WR9"
+ ],
+ "rapido": true,
+ "classificador": "tcn"
+}

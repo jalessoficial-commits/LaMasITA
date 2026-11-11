@@ -1,0 +1,29 @@
+{
+ "custos": {
+  "troca": 6.0,
+  "parada": 12.0,
+  "reinicio": 1.0
+ },
+ "spellF1_validacao": 0.6184,
+ "macroF1_validacao": 0.9173,
+ "jogos": [
+  "J03WMX",
+  "J03WN1",
+  "J03WOH",
+  "J03WOY",
+  "J03WPY",
+  "J03WQQ",
+  "J03WR9"
+ ],
+ "rapido": true,
+ "classificador": "lstm_f5_s10+lstm_f5_s11+lstm_f5_s12+lstm_f5_s20+lstm_f5_s21+lstm_f5_s22",
+ "membros": [
+  "lstm_f5_s10",
+  "lstm_f5_s11",
+  "lstm_f5_s12",
+  "lstm_f5_s20",
+  "lstm_f5_s21",
+  "lstm_f5_s22"
+ ],
+ "semente": 0
+}
