@@ -77,11 +77,17 @@ def segment_ids(labels):
     return np.cumsum(change)
 
 
-def set_pieces():
+def smart_tags(code):
+    """Eventos do Smart Tagging com esse code (ex.: 'SET PIECES', 'GOALS'), em ordem de start_frame."""
     with open(ST_PATH, encoding="utf-8") as handle:
         events = json.load(handle)
-    sp = [e for e in events if (e["code"] or "").upper() == "SET PIECES"]
-    return pd.DataFrame(sp).sort_values("start_frame").reset_index(drop=True)
+    sp = [e for e in events if (e["code"] or "").upper() == code.upper()]
+    return pd.DataFrame(sp, columns=["start_frame", "end_frame", "code", "team", "type"]).sort_values(
+        "start_frame").reset_index(drop=True)
+
+
+def set_pieces():
+    return smart_tags("SET PIECES")
 
 
 def weak_labels(X, index, pre_s=PRE_S, post_s=POST_S, far_s=FAR_S, use_line=True,

@@ -4,6 +4,7 @@ import {
 import { Pitch } from "./pitch.js";
 import { Overlay } from "./overlay.js";
 import { initRotulos, rotulosKey, drawRotulos, rotulosFrame, rotulosRange } from "./rotulos.js";
+import { initClipes, clipesRefresh, clipesFrame, clipesKey, drawClipes } from "./clipes.js";
 
 const GT_URL = "../evaluation/gt/BAR-ATH_possession_gt_public.csv";
 const RESULTS_URL = "../evaluation/results/";
@@ -20,7 +21,7 @@ const LABEL_COLORS = ["#22272e", "#1f6fd1", "#ee2523", "#9aa3ad"]; // X H(azul B
 const TAG_COLORS = { Barcelona: "#1f6fd1", "Atletic Club": "#ee2523" };
 // stoppages (analise/paradas.py) by restart type, and whistles
 const STOP_COLORS = { apito: "#c0ca33", linha_de_fundo: "#ab47bc", lateral: "#26a69a", centro: "#ff7043",
-  campo: "#8d6e63", desconhecida: "#78909c", sem_evento: "#546e7a" };
+  campo: "#8d6e63", desconhecida: "#78909c", sem_evento: "#546e7a", gol: "#ffffff", inicio_de_tempo: "#5c6bc0" };
 const WHISTLE_COLOR = "#ffeb3b";
 
 // Default look of each new layer; extra layers cycle through the alternatives so they stand out.
@@ -78,6 +79,23 @@ async function init() {
     pause, isPlaying: () => state.playing,
     showBlock: () => { state.range = "bloco"; $("range").value = "bloco"; drawTimelineBase(); drawTimeline(); },
   });
+  await initClipes({
+    getFrame: () => state.frame, setFrame: (f) => { if (state.playing) pause(); setFrame(f); },
+    play, pause, isPlaying: () => state.playing, fps: state.fps, setStatus,
+    redraw: () => { drawTimelineBase(); drawTimeline(); },
+    getPred: () => ({ labels: state.pred, name: state.predName }),
+    getParadas: () => state.events.paradas,
+  });
+  // ?pred=<name>: loads viewer/data/<name>.csv as the prediction (e.g. ?eventos=eventos_v3&pred=pred_v3)
+  const predParam = new URLSearchParams(location.search).get("pred");
+  if (predParam) {
+    const name = predParam.replace(/[^\w-]/g, "");
+    try {
+      setPrediction(await fetchPossession(`data/${name}.csv`, state.nFrames), name);
+    } catch (err) {
+      setStatus(`⚠ ?pred=${name}: ${err.message}`);
+    }
+  }
 }
 
 function setStatus(text) { $("status").textContent = text; }
@@ -159,6 +177,7 @@ function setPrediction(labels, name) {
     }
     state.predAcc = n ? { ok, n } : null;
   }
+  clipesRefresh();
   drawTimelineBase();
   render();
 }
@@ -268,6 +287,7 @@ function drawTimelineBase() {
     ctx.fillRect(((s - a) / span) * w - 1, ROWS.ev[0] - 2, 2, ROWS.ev[1] + 4);
   }
   drawRotulos(ctx, a, b, w, ROWS.lab);
+  drawClipes(ctx, a, b, w, ROWS.pred);
   ctx.fillStyle = "#8b95a3";
   ctx.font = "10px system-ui";
   ctx.fillText(`${a}`, 3, h - 2);
@@ -442,6 +462,7 @@ function render() {
   renderPossession();
   drawTimeline();
   rotulosFrame(f);
+  clipesFrame(f);
   $("scrub").value = f;
   $("clock").textContent = `frame ${f} · ${fmtTime(f / state.fps)} · ${matchClock(f)}`;
   const active = state.tags.filter((t) => t.start_frame <= f && f < t.end_frame);
@@ -553,7 +574,7 @@ function bindUI() {
   window.addEventListener("resize", onResize);
   window.addEventListener("keydown", (e) => {
     if (e.target.matches("input[type=text], input[type=number], select")) return;
-    if (rotulosKey(e)) return;
+    if (clipesKey(e) || rotulosKey(e)) return;
     const big = e.ctrlKey || e.metaKey ? 250 : e.shiftKey ? 25 : 1;
     if (e.code === "Space") { e.preventDefault(); state.playing ? pause() : play(); }
     else if (e.key === "ArrowRight") { e.preventDefault(); step(big); }

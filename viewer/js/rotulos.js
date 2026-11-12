@@ -30,7 +30,7 @@ const $ = (id) => document.getElementById(id);
 
 // ---- CSV -------------------------------------------------------------------------------------
 
-function parseCSV(text) {
+export function parseCSV(text) {
   const rows = [];
   let row = [], field = "", quoted = false;
   text = text.replace(/^﻿/, "");
@@ -50,7 +50,7 @@ function parseCSV(text) {
   return body.map((r) => Object.fromEntries(head.map((h, j) => [h, r[j] ?? ""])));
 }
 
-function toCSV(cols, rows) {
+export function toCSV(cols, rows) {
   const q = (v) => { v = v == null ? "" : String(v); return /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v; };
   return [cols.join(","), ...rows.map((r) => cols.map((c) => q(r[c])).join(","))].join("\n") + "\n";
 }

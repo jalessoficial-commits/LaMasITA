@@ -109,6 +109,7 @@ OUT_POSSE = os.path.join(HERE, "out", "rotulos_posse.csv")
 
 
 OUT_BLOCOS = os.path.join(HERE, "out", "rotulos_blocos.csv")
+OUT_CLIPES = os.path.join(HERE, "out", "rotulos_clipes.csv")
 
 
 def carregar_posse(path=OUT_POSSE):
@@ -127,6 +128,17 @@ def carregar_blocos(path=OUT_BLOCOS):
         return pd.DataFrame(columns=["bloco", "inicio", "fim", "obs"])
     df = pd.read_csv(path, dtype={"obs": str}).fillna({"obs": ""})
     return df.astype({"inicio": int, "fim": int}).sort_values("inicio").reset_index(drop=True)
+
+
+def carregar_clipes(path=OUT_CLIPES):
+    """Vereditos do painel "Clipes D" do viewer: inicio, fim (o clipe previsto), fonte (a predição),
+    veredito ('certo' | 'falso' | 'ajustado'), inicio_real, fim_real, obs. None se ainda não existe."""
+    if not os.path.exists(path):
+        return None
+    df = pd.read_csv(path, dtype={"fonte": str, "veredito": str, "obs": str}).fillna({"obs": "", "veredito": ""})
+    for c in ("inicio_real", "fim_real"):
+        df[c] = pd.to_numeric(df[c], errors="coerce")
+    return df[df.veredito != ""].astype({"inicio": int, "fim": int}).sort_values("inicio").reset_index(drop=True)
 
 
 def gt_blocos(n_frames, posse=None, blocos=None):

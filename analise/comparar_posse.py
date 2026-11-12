@@ -3,6 +3,7 @@
     python analise/comparar_posse.py                    # grava analise/out/posse/comparacao.csv
     python analise/comparar_posse.py --exportar NOME    # e a config PADRAO em evaluation/results/NOME.csv
                                                         # e viewer/data/pred_NOME.csv
+    python analise/comparar_posse.py --d v3 --exportar posse_viterbi_v3   # com o D do detector v3
 
 Gabaritos (nenhum é usado para treinar; a grade é pequena de propósito):
     publico   GT público (5 min, evaluation/gt)
@@ -55,13 +56,14 @@ def acc_time(gt, pred):
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--exportar", default=None)
+    ap.add_argument("--d", default=D_VARIANTE, help="variante do D (out/tracking/D_<variante>.csv), ex.: v3")
     args = ap.parse_args()
     os.makedirs(OUT, exist_ok=True)
 
     players, _, slot_teams, _ = load_atd()
     N = len(players)
     graded = R.graded_mask(N)
-    dead = carregar_D()
+    dead = carregar_D(args.d)
     gts = {"publico": R.gt_public(), "blocos": RP.gt_blocos(N)}
     print({k: dict(zip(*np.unique(v[v != "X"], return_counts=True))) for k, v in gts.items()})
 

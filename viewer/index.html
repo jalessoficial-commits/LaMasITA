@@ -193,6 +193,29 @@
       CSV extra: <code>frame,track_id,team,x,y</code> — <code>frame</code> = frame do vídeo (0-based),
       <code>team</code> = H / A / B (bola), <code>x,y</code> normalizados 0–1 como o ATD.
     </div>
+    <h3>Clipes de bola morta</h3>
+    <div class="layer">
+      <div class="help" id="clipInfo"></div>
+      <div class="row">
+        <label><input type="checkbox" id="clipStop" checked> parar no fim do clipe</label>
+        <label><input type="checkbox" id="clipPend"> só não revisados</label>
+      </div>
+      <div class="rotlist" id="clipList"></div>
+      <div class="help" id="clipCur"></div>
+      <div class="row">
+        <button id="clipPrev" title="clipe anterior (J)">⏮ J</button>
+        <button id="clipReplay" title="repetir o clipe (R)">↻ R</button>
+        <button id="clipNext" title="próximo clipe (K)">K ⏭</button>
+        <button id="clipOk" title="o D está certo (1)">✓ certo (1)</button>
+        <button id="clipBad" title="não houve bola morta: era jogo (2)">✗ falso (2)</button>
+      </div>
+      <div class="row">
+        <button id="clipIni" title="o D real começa neste frame">início real aqui</button>
+        <button id="clipFim" title="o D real termina neste frame">fim real aqui</button>
+      </div>
+      <input type="text" id="clipObs" placeholder="obs (ex.: gol, VAR, substituição)">
+      <div class="help" id="clipSave"></div>
+    </div>
     <h3>Rotular</h3>
     <div class="layer">
       <div class="row"><label><input type="checkbox" id="rotKeys" checked> atalhos de rotulação</label></div>
@@ -227,6 +250,8 @@
       <kbd>Shift</kbd>+setas ±1 s · <kbd>Ctrl</kbd>+setas ±10 s ·
       <kbd>[</kbd><kbd>]</kbd> velocidade · <kbd>M</kbd> som · <kbd>G</kbd> início do gabarito ·
       <kbd>N</kbd> / <kbd>Shift</kbd>+<kbd>N</kbd> próxima / anterior parada ou apito<br>
+      clipes D: <kbd>K</kbd> próximo · <kbd>J</kbd> anterior · <kbd>R</kbd> repetir · <kbd>1</kbd> certo ·
+      <kbd>2</kbd> falso<br>
       rotular: <kbd>I</kbd> início · <kbd>F</kbd> fim · <kbd>V</kbd> viva · <kbd>⏎</kbd> próxima ·
       <kbd>P</kbd> parada nova · posse: <kbd>H</kbd> / <kbd>A</kbd> / <kbd>D</kbd> a partir deste frame ·
       <kbd>Z</kbd> desfazer

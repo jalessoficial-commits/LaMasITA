@@ -35,6 +35,7 @@ LABEL_FILES = {
     "rotulos_manuais": "id,categoria,frame_ref,tempo_video,previsto_inicio,previsto_fim,info,inicio_real,fim_real,obs",
     "rotulos_posse": "frame,time,obs",
     "rotulos_blocos": "bloco,inicio,fim,obs",
+    "rotulos_clipes": "inicio,fim,fonte,veredito,inicio_real,fim_real,obs",
 }
 MAX_LABEL_BYTES = 5 << 20
 
