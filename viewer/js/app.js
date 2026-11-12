@@ -203,7 +203,19 @@ function renderPossession() {
 const timelineBase = document.createElement("canvas");
 const ROWS = { gt: [2, 18], pred: [22, 16], err: [40, 5], tags: [48, 20], ev: [70, 12], lab: [86, 10] };
 
+// janelas que acompanham o vídeo: a timeline mostra o trecho fixo (0-5 min, 5-10 min...) que
+// contém o frame atual e passa para o seguinte quando o vídeo chega ao fim do trecho
+const PAGE_FRAMES = { p1: 60 * 25, p2: 2 * 60 * 25, p5: 5 * 60 * 25 };
+let lastPage = null;
+
+function pageOf(f) {
+  const len = PAGE_FRAMES[state.range];
+  const a = Math.floor(f / len) * len;
+  return [a, Math.min(state.nFrames - 1, a + len - 1)];
+}
+
 function viewRange() {
+  if (PAGE_FRAMES[state.range]) return pageOf(state.frame);
   const [h1, h2] = state.halves.length ? state.halves : [[1, 11185, 90651], [2, 110808, 190197]];
   switch (state.range) {
     case "h1": return [h1[1], h1[2]];
@@ -227,6 +239,7 @@ function drawTimelineBase() {
   ctx.fillStyle = "#12151a";
   ctx.fillRect(0, 0, w, h);
   const [a, b] = viewRange();
+  lastPage = `${state.range}:${a}`;
   const span = b - a + 1;
   for (let x = 0; x < w; x++) {
     const f = Math.min(b, Math.floor(a + (x / w) * span));
@@ -276,6 +289,7 @@ function drawTimelineBase() {
 }
 
 function drawTimeline() {
+  if (PAGE_FRAMES[state.range] && lastPage !== `${state.range}:${viewRange()[0]}`) drawTimelineBase();
   const canvas = $("timeline");
   const ctx = canvas.getContext("2d");
   ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -490,6 +504,15 @@ function bindUI() {
   };
   $("goGT").onclick = () => setFrame(GT_WINDOW[0]);
   $("goH2").onclick = () => setFrame(state.halves[1] ? state.halves[1][1] : 110808);
+  // PageUp / PageDown: trecho anterior / seguinte quando a timeline está em janelas que acompanham
+  document.addEventListener("keydown", (e) => {
+    const len = PAGE_FRAMES[state.range];
+    if (!len || (e.key !== "PageUp" && e.key !== "PageDown")) return;
+    if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT") return;
+    e.preventDefault();
+    const [a] = pageOf(state.frame);
+    setFrame(Math.max(0, Math.min(state.nFrames - 1, a + (e.key === "PageDown" ? len : -len))));
+  });
   $("range").onchange = (e) => {
     state.range = e.target.value;
     drawTimelineBase();
