@@ -1,10 +1,11 @@
-"""Detector de bola morta v2 x v3 x v4 (analise/paradas.py, Config() x Config.v3() x Config.v4()).
+"""Detector de bola morta v2 x v3 x v4 x v5 (analise/paradas.py, Config() x Config.v3() x .v4() x .v5()).
 
     python analise/avaliar_v3.py              # tabela v2 x v3, casos (gols, 57942, 20636) e rótulos
     python analise/avaliar_v3.py --exportar   # e grava out/tracking/{D,paradas}_v3.csv
     python analise/exportar_viewer_tracking.py                       # -> viewer/data/pred_v3.csv, eventos_v3.json
     python analise/comparar_posse.py --d v3 --exportar posse_viterbi_v3   # posse Viterbi com o D v3
     python analise/comparar_posse.py --d v4 --exportar posse_viterbi_v4   # ... e com o D v4
+    python analise/casar_campeao.py --d v5 --min-posse-s 1 --exportar     # D v5 + H/A do campeão
 
 Mesma variante de produção do v2: bola atd_bruto, "+fora" (bola na linha ou além) e "+uniao".
 A bola "fundida" entra só no v3, nos sinais de bola (gol, veto de bola viva).
@@ -176,7 +177,7 @@ def main():
     base = T.load_baseline("baseline_smooth125")
     A = CT.Avaliador(S, base)
     rows, avs = [], {}
-    for nome, cfg in (("v2", P.Config(v1_uniao=True)), ("v3", P.Config.v3()), ("v4", P.Config.v4())):
+    for nome, cfg in (("v2", P.Config(v1_uniao=True)), ("v3", P.Config.v3()), ("v4", P.Config.v4()), ("v5", P.Config.v5())):
         d, tab = rodar(pack, cfg)
         m_man, av = metricas_manuais(d)
         rows.append(dict(detector=nome, **A.linha(d, pack["offsets"]), **metricas_blocos(d, base), **m_man,
@@ -184,17 +185,20 @@ def main():
         avs[nome] = av
         print("\n==", nome)
         print(casos(d, tab).round(3).to_string(index=False))
-        if args.exportar and nome in ("v3", "v4"):
+        if args.exportar and nome in ("v3", "v4", "v5"):
             tab.to_csv(os.path.join(OUT, "paradas_{}.csv".format(nome)), index=False)
             pd.DataFrame({"frame": np.arange(S.N), "morta": d.astype(int)}).to_csv(
                 os.path.join(OUT, "D_{}.csv".format(nome)), index=False)
+            gk = tab.attrs.get("goleiro")
+            if gk is not None and len(gk):      # v5: D tirados porque o goleiro segurava a bola (time dele)
+                gk.to_csv(os.path.join(OUT, "goleiro_{}.csv".format(nome)), index=False)
             print("gravado out/tracking/D_{0}.csv e paradas_{0}.csv".format(nome))
             print("viewer: python analise/exportar_viewer_tracking.py  (pred_{0}.csv, eventos_{0}.json)".format(nome))
     pd.set_option("display.width", 250, "display.max_columns", 40)
     res = pd.DataFrame(rows).set_index("detector").T
     print("\n", res.round(3).to_string())
-    m = avs["v3"].merge(avs["v4"], on=["id", "categoria", "real"], suffixes=("_v3", "_v4"))
-    print("\nrótulos manuais (v3 x v4):")
+    m = avs["v4"].merge(avs["v5"], on=["id", "categoria", "real"], suffixes=("_v4", "_v5"))
+    print("\nrótulos manuais (v4 x v5):")
     print(m.round(2).to_string(index=False))
 
 

@@ -12,6 +12,9 @@ casa as duas saídas prontas, frame a frame, como o modo "rígido" do posse_ml f
     viva no detector, D no campeão   -> o H/A do campeão mais perto no tempo (antes ou depois)
     fora dos tempos (X)           -> o rótulo do campeão
 
+Com o D v5 vem out/tracking/goleiro_v5.csv: os D tirados porque o goleiro segurava a bola (o ATD perde a
+bola na mão dele). Ali o rótulo é o time do goleiro, não o vizinho no tempo.
+
 Depois, uma posse curta (< --min-posse-s) espremida entre duas do outro time, ou entre um D e uma
 posse do outro time, é engolida pelo vizinho: o campeão parte posses (32 contra 24 nos blocos).
 """
@@ -45,12 +48,18 @@ def ler_D(nome):
     return pd.read_csv(caminho).morta.values.astype(bool)
 
 
+def ler_goleiro(nome):
+    """Trechos (inicio, fim, time) em que o goleiro segurava a bola, se o D tiver (v5)."""
+    caminho = os.path.join(D_DIR, "goleiro_{}.csv".format(nome))
+    return pd.read_csv(caminho) if os.path.exists(caminho) else None
+
+
 def _runs(mask):
     r = np.diff(np.r_[0, mask.astype(int), 0])
     return list(zip(np.flatnonzero(r == 1), np.flatnonzero(r == -1)))
 
 
-def casar(campeao, morta, graded, min_posse_s=0.0):
+def casar(campeao, morta, graded, min_posse_s=0.0, goleiro=None):
     out = campeao.copy()
     ha = np.isin(campeao, ["H", "A"])
     idx = np.flatnonzero(ha)
@@ -62,6 +71,10 @@ def casar(campeao, morta, graded, min_posse_s=0.0):
     viva = graded & ~morta
     out[viva & ~ha] = campeao[perto[viva & ~ha]]
     out[graded & morta] = "D"
+    if goleiro is not None:
+        for r in goleiro.itertuples():
+            m = graded[r.inicio:r.fim] & ~morta[r.inicio:r.fim]
+            out[r.inicio:r.fim][m] = r.time
     if min_posse_s > 0:
         out = engolir_curtas(out, graded, int(min_posse_s * FPS))
     return out
@@ -104,7 +117,7 @@ def placar(lab):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--campeoes", nargs="+", default=["campeao_tcn", "campeao_lstm"])
-    ap.add_argument("--d", nargs="+", default=["v2", "v3", "v4"])
+    ap.add_argument("--d", nargs="+", default=["v2", "v3", "v4", "v5"])
     ap.add_argument("--min-posse-s", type=float, nargs="+", default=[0.0, 1.0, 2.0])
     ap.add_argument("--exportar", action="store_true", help="grava o casamento escolhido (--d e --min-posse-s em [0])")
     args = ap.parse_args()
@@ -116,7 +129,7 @@ def main():
         for dn in args.d:
             morta = ler_D(dn)
             for mp in args.min_posse_s:
-                lab = casar(camp, morta, graded, mp)
+                lab = casar(camp, morta, graded, mp, ler_goleiro(dn))
                 rows.append(dict(versao=c, D=dn, min_posse_s=mp, **placar(lab)))
     for dn in args.d:
         p = os.path.join(RES, "posse_viterbi_{}.csv".format(dn))
@@ -127,7 +140,7 @@ def main():
     if args.exportar:
         dn, mp = args.d[0], args.min_posse_s[0]
         for c in args.campeoes:
-            lab = casar(ler_rotulos(os.path.join(RES, c + ".csv")), ler_D(dn), graded, mp)
+            lab = casar(ler_rotulos(os.path.join(RES, c + ".csv")), ler_D(dn), graded, mp, ler_goleiro(dn))
             nome = "casado_{}_{}".format(c.replace("campeao_", ""), dn)
             df = pd.DataFrame({"frame": np.arange(len(lab)), "label": lab})
             df.to_csv(os.path.join(RES, nome + ".csv"), index=False)

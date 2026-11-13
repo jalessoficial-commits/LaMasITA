@@ -108,6 +108,9 @@ class Config:
     viva_funda_sem_evento: bool = True   # aplica também aos trechos v1 sem evento
     viva_funda_antes_s: float = 6.0      # ... a parte antes do jogo voltar fica se tiver >= N s
     goleiro_m: float = 0.0               # fim de trecho v1 com a bola na mão do goleiro (a <= N m) = jogo
+    # ---- v5 (feedback do time, 2026-11-12: "o goleiro pega a bola, o ATD perde a bola, vira D") -------
+    goleiro_segura_s: float = 0.0        # D (<= N s) que começa com a bola no goleiro, sem apito nem tag: posse dele
+    goleiro_segura_m: float = 3.0        # ... bola vista pela última vez a <= N m do goleiro, dentro da área
 
     @classmethod
     def v3(cls, **kw):
@@ -121,6 +124,12 @@ class Config:
                     goleiro_m=3.5, gol_apito_s=8.0)
         base.update(kw)
         return cls.v3(**base)
+
+    @classmethod
+    def v5(cls, **kw):
+        base = dict(goleiro_segura_s=25.0)
+        base.update(kw)
+        return cls.v4(**base)
 
 
 def v1_runs(S, cfg):
@@ -204,6 +213,48 @@ def _goleiro_com_bola(S, cfg):
     dir_ = na_area & (bx < E.LENGTH - 5.5) & (bx > E.LENGTH - 17.5) & (near == xmax)
     S._gk = (dnear <= cfg.goleiro_m) & (esq | dir_) & (_vel_bola(S) < 3)
     return S._gk
+
+
+def _areas(S):
+    """(na grande área, na pequena área), com 1 m de folga na grande área."""
+    bx, by = S.ball[:, 0], S.ball[:, 1]
+    dy = np.abs(by - E.WIDTH / 2)
+    dx = np.minimum(bx, E.LENGTH - bx)
+    return (dy < 20.16 + 1) & (dx < 16.5 + 1), (dy < 9.16) & (dx < 5.5)
+
+
+def _goleiro(S):
+    """v5: por frame, o time que defende o gol do lado da bola e a distância da bola ao goleiro dele.
+
+    Goleiro = o jogador mais recuado desse time (o slot do ATD troca às vezes de dono: em 23831 o
+    slot 45, do Athletic, aparece com a bola na mão do goleiro do Barça). O lado de cada time sai da
+    média de x em cada tempo (os blocos de S.graded)."""
+    if getattr(S, "_gol", None) is not None:
+        return S._gol
+    _, _, slot_teams, _ = E.load_atd()
+    slot_teams = np.asarray(slot_teams)
+    px, bx = S.players[:, :, 0], S.ball[:, 0]
+    baixo = np.full(S.N, "", object)               # quem defende o gol de x = 0
+    for a, b in T.runs(S.graded):
+        mH = np.nanmean(px[a:b, slot_teams == "H"])
+        mA = np.nanmean(px[a:b, slot_teams == "A"])
+        baixo[a:b] = "H" if mH < mA else "A"
+    outro = np.where(baixo == "H", "A", np.where(baixo == "A", "H", ""))
+    lado_baixo = bx < E.LENGTH / 2
+    time = np.where(lado_baixo, baixo, outro)
+    dist = np.full(S.N, np.inf)
+    for t in ("H", "A"):
+        idx = np.flatnonzero(slot_teams == t)
+        x = px[:, idx]
+        imin = idx[np.argmin(np.where(np.isnan(x), np.inf, x), axis=1)]
+        imax = idx[np.argmax(np.where(np.isnan(x), -np.inf, x), axis=1)]
+        k = np.where(lado_baixo, imin, imax)
+        g = S.players[np.arange(S.N), k]
+        d = np.hypot(g[:, 0] - bx, g[:, 1] - S.ball[:, 1])
+        sel = (time == t) & ~np.isnan(d)
+        dist[sel] = d[sel]
+    S._gol = (time, dist)
+    return S._gol
 
 
 def _bola_viva(S, a, b, cfg):
@@ -471,9 +522,51 @@ def detectar_paradas(S, cfg=None, inicio=None, reinicio=None, offsets=None, v1_d
             longo = max(e1 - s1, e2 - s2) >= cfg.pausa_min_s * FPS
             if longo and s2 - e1 <= cfg.pausa_fundir_s * FPS and np.nanmean(S.speed1[e1:s2]) < cfg.pausa_vel:
                 dead[e1:s2] = True
+    # v5: o goleiro pega a bola, o ATD perde a bola na mão dele e o v1 vê D (jogadores lentos, sem bola).
+    # O D começa com a bola vista no goleiro, dentro da área e do campo; não há apito nem tag; e, se não
+    # a bola volta na área fora da pequena área (o tiro de meta é na pequena área). Com um apito em
+    # qualquer ponto do D não mexe: no rótulo manual 6 (175263) o jogo já estava parado e o goleiro só
+    # ajeitou a bola para a cobrança.
+    goleiro_spans = []
+    if cfg.goleiro_segura_s > 0:
+        gtime, gdist = _goleiro(S)
+        na_area, peq = _areas(S)
+        od = _out_dist(S)
+        pres = ~np.isnan(S.ball[:, 0])
+        apito_f = np.array(sorted(e["frame"] for e in list(inicio) + autoriza if e["fonte"] == "apito"))
+        for s, e in T.runs(dead):
+            if travado[s:e].any():
+                continue
+            w0 = max(0, s - 3 * FPS)
+            k = np.flatnonzero(pres[w0:s + FPS])
+            if not len(k):
+                continue
+            fa = w0 + int(k[-1])
+            if not (na_area[fa] and od[fa] < 0 and gdist[fa] <= cfg.goleiro_segura_m):
+                continue
+            if len(apito_f) and np.any((apito_f >= fa - 3 * FPS) & (apito_f < e + FPS)):
+                continue
+            if e - s > cfg.goleiro_segura_s * FPS:
+                continue
+            if len(tag_sf_all) and np.any((tag_sf_all >= s - 2 * FPS) & (tag_sf_all <= e + 5 * FPS)):
+                continue
+            k2 = np.flatnonzero(pres[e - FPS:e + 6 * FPS])
+            if not len(k2):
+                continue
+            fd = e - FPS + int(k2[0])
+            if not (na_area[fd] and not peq[fd] and od[fd] < 0):
+                continue
+            dead[s:e] = False
+            goleiro_spans.append(dict(inicio=int(min(fa, s)), fim=int(e), time=gtime[fa],
+                                      dist_m=round(float(gdist[fa]), 2)))
+            for r in rows:
+                if s <= r["inicio"] < e:
+                    r["descartada"] = True
+        rows = [r for r in rows if not r.get("descartada")]
     dead &= S.graded
     tabela = pd.DataFrame(rows).sort_values("inicio").reset_index(drop=True) if rows else pd.DataFrame()
     tabela.attrs["descartes"] = pd.DataFrame(descartes)
+    tabela.attrs["goleiro"] = pd.DataFrame(goleiro_spans)
     return dead, tabela
 
 
