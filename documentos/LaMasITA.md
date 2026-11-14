@@ -162,7 +162,8 @@ enters only the v3 goal and live-ball signals). *Homography:* ball from
 pixels to pitch, pitch mask, camera position for the DFL degradation. *Smart Tagging:* set pieces, goals
 and kick-offs in the dead-ball detector; weak labels; whistle frequency calibration. *Public ground truth:*
 see Section 5. *Broadcast video:* tried and dropped — aligned to the tactical video to tell live shots
-from replays as evidence of dead ball; that evidence is not used in the rigid mode of the submission.
+from replays as evidence of dead ball; that evidence is not used in the rigid mode of the submission, and
+the pipeline does not read the broadcast files.
 
 **External.** Roboflow ball detector weights (public); Sportec Open DFL dataset (Bassek et al., 2025,
 CC-BY 4.0), the only training data of the possession network.
@@ -257,8 +258,14 @@ python gerar_submissao.py     # writes LaMasITA.csv and validates it
 features and whistle; dead ball v2 and v5; the TCN (trained weights in `modelo/campeao_tcn/`); the final
 assembly; and the format check. Ball detection took about 27 h on a laptop GPU (RTX 3050, 6 GB) and resumes
 if interrupted; every other step takes minutes. The network always predicts on CPU so that the output does
-not depend on the machine. Retraining is not needed, but is reproducible with `python -m posse_ml.baixar_dfl`
-and the commands in `posse_ml/README.md`.
+not depend on the machine. Retraining is not needed, but is reproducible with
+`python -m posse_ml.baixar_dfl` and the commands in `posse_ml/README.md`.
+
+**What was verified.** Re-running everything from the Viterbi ball track onwards
+(`gerar_submissao.py --conferir`) on the machine that produced the submission gives a byte-identical file
+(same sha256). The ball detection itself was not re-run. It ran on a GPU, where results can vary slightly
+with the card and driver: a detection near the confidence threshold that changes side would propagate to
+a few frames of the final file.
 
 ## References
 
