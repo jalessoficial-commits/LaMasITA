@@ -96,7 +96,7 @@ def main():
     rodar("6. posse H/A: TCN, bola morta v2 rígida",
           ["-m", "posse_ml", "--instancia", "viterbi", "--modelos", "modelo/campeao_tcn",
            "--paradas", os.path.relpath(d_v2, RAIZ), "--modo-paradas", "rigido", "--out", os.path.relpath(camp, RAIZ)],
-          [camp], r)
+          [camp], True)           # sempre: evaluation/results/campeao_tcn.csv está no Git, então nunca falta
 
     casado = os.path.join(res, "casado_tcn_v5.csv")
     rodar("7. D v5 + H/A da TCN", ["analise/casar_campeao.py", "--campeoes", "campeao_tcn", "--d", "v5",
