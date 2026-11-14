@@ -1,6 +1,12 @@
 ---
 title: "LaMasITA — Technical Document"
 subtitle: "More than a Hack 2027, Phase 1: Ball Possession (BAR-ATH)"
+author:
+  - Samuel Jales Terrinha Guimarães
+  - Pedro Henrique Oliveira de Araújo
+  - Nuno Prado de Medeiros Paulos
+  - Arthur Augusto de Queiroz Gomes
+  - Bryan Santos Monteiro
 geometry: margin=2.2cm
 fontsize: 10pt
 ---
