@@ -190,6 +190,7 @@ def main():
     print("\n== 8. validação de", os.path.basename(final), flush=True)
     subprocess.run([PY, "evaluation/validate_submission.py", final], cwd=RAIZ, check=True)
     print("\nsubmissão pronta: {}".format(final))
+    print("sha256 (quebras de linha normalizadas): {}".format(resumo(final)))
 
 
 if __name__ == "__main__":
