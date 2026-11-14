@@ -11,9 +11,6 @@ geometry: margin=2.2cm
 fontsize: 10pt
 ---
 
-**Team LaMasITA:** Samuel Jales Terrinha Guimarães, Pedro Henrique Oliveira de Araújo, Nuno Prado de
-Medeiros Paulos, Arthur Augusto de Queiroz Gomes, Bryan Santos Monteiro.
-
 Repository: `github.com/jalessoficial-commits/LaMasITA`. Every number below is taken from the READMEs
 of the repository (`tracking_bola/`, `posse/`, `posse_ml/`, `diagnostico/`, `viewer/`), from the
 notebooks, docstrings and commit notes of `analise/`, or from `evaluation/run_evaluation.py` and
