@@ -22,7 +22,7 @@ The submission is produced by three layers, each replaceable and each validated 
 
 | layer | folder | what it does |
 |---|---|---|
-| **Ball** | `tracking_bola/` | our own ball track from the tactical video: a public football ball detector on every graded frame, a pitch mask, and a Viterbi track over the detections and the ATD ball |
+| **Ball** | `tracking_bola/` | our own ball track from the tactical video: a public football ball detector on every graded frame and a pitch mask, combined with the ATD ball in two versions — a per-frame fusion (used by the dead-ball layer) and a Viterbi track (used by the possession layer) |
 | **Dead ball (D)** | `analise/` | a deterministic stoppage detector: each stoppage is an interval [start, restart], found from the referee's whistle (audio), the ball leaving the pitch, collective player speed and the Smart Tagging |
 | **Possession (H/A)** | `posse_ml/` | a temporal convolutional network trained only on the seven open DFL matches, degraded to look like our tracking, decoded with a Viterbi that charges a price per change of possession |
 
@@ -54,7 +54,14 @@ the per-frame homography and discarded if it falls more than **2 m** outside the
 were objects outside the pitch detected with high confidence, which temporal consistency cannot remove
 because a static object is continuous.
 
-A per-frame fusion with the ATD was the first tracker (detector alone if confidence ≥ 0.8 where the ATD has
+From the same masked detections we build **two ball tracks, each used by a different layer**:
+
+- **Fusion** (`out/full_bola.csv`, from `run_champion_full.py`, exported in the ATD format by
+  `export_ball.py`): used by the **dead-ball detector** (`analise/`), only where the ATD has no ball.
+- **Viterbi track** (`out/viterbi_bola.csv`, from `track_temporal.py --method viterbi`): used by the
+  **possession network** (`posse_ml/`), in training and in prediction.
+
+The per-frame fusion with the ATD was the first tracker (detector alone if confidence ≥ 0.8 where the ATD has
 no ball; where it has one, the detector refines it within 40 px, overrides it with confidence ≥ 0.8, or the
 ATD is kept). It was chosen on 292 hand-annotated frames and measured on 93 new ones, never used to choose
 anything:
@@ -67,7 +74,7 @@ anything:
 | false alarm (14 frames without ball) | 7.1% | 7.1% |
 | F1 | 64.6% | 76.8% |
 
-The possession layer uses a **Viterbi track** over the same candidates (`track_temporal.py`): the
+The second version, used by the possession layer, is a **Viterbi track** over the same candidates (`track_temporal.py`): the
 lowest-cost sequence over each half, with cost 1 − confidence per candidate, 0.3 for the ATD ball, 0.5 per
 frame without ball, 0.1 per metre between frames, jumps above 45 m/s forbidden and gaps of up to 12 frames
 interpolated. On the test set it has a higher hit rate (79.7%) and a higher false-alarm rate (42.9%) than
@@ -75,6 +82,8 @@ the fusion: it accepts coherent sequences of medium-confidence detections that t
 the whole match it has a ball in 83.5% of graded frames (fusion 72.8%, ATD 59.3%) and 34 gaps of 2 s or more
 with the ball in play (fusion 59, ATD 51). Possession models built on it validated better than on the fusion,
 on the DFL (spellF1 0.596 against 0.580) and on the public window (0.690 against 0.662, trees).
+The dead-ball layer keeps the fusion, and there the ATD ball comes first: our detector projects the ball
+onto the pitch through the homography, so a ball in the air appears displaced, which the ATD ball is not.
 The annotated frames were used only to validate and test; none of them is an output of the system.
 
 ### 1.2 Dead ball (`analise/`)
@@ -157,8 +166,8 @@ No possession rule is hand-written for H/A; they follow from the price per chang
 ## 3. Assets and methods: used, tried and dropped
 
 **Provided assets.** *Tactical video:* ball detection and audio (whistle). *ATD:* all players; the ATD ball
-as one candidate in the ball track and as the ball of the dead-ball start events (our tracker's ball
-enters only the v3 goal and live-ball signals). *Homography:* ball from
+as one candidate in both ball tracks and as the ball of the dead-ball start events (our fusion ball fills
+in where the ATD has none, only in the v3 goal and live-ball signals). *Homography:* ball from
 pixels to pitch, pitch mask, camera position for the DFL degradation. *Smart Tagging:* set pieces, goals
 and kick-offs in the dead-ball detector; weak labels; whistle frequency calibration. *Public ground truth:*
 see Section 5. *Broadcast video:* tried and dropped — aligned to the tactical video to tell live shots
