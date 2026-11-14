@@ -9,8 +9,8 @@ numpy==2.5.3
 pandas==3.0.5
 scipy==1.18.1
 scikit-learn==1.9.1
-torch            # TODO fixar
-ultralytics      # TODO fixar  (detector de bola do Roboflow; licença AGPL-3.0)
-opencv-python    # TODO fixar
-imageio-ffmpeg   # TODO fixar  (ffmpeg para o apito; dispensável se o ffmpeg estiver no PATH)
-gdown            # TODO fixar  (só para baixar os pesos do detector)
+torch==2.11.0
+ultralytics==8.4.184   # (detector de bola do Roboflow; licença AGPL-3.0)
+opencv-python==5.0.0.93
+imageio-ffmpeg==0.8.1   # (ffmpeg para o apito; dispensável se o ffmpeg estiver no PATH)
+gdown==6.4.2   # (só para baixar os pesos do detector)
