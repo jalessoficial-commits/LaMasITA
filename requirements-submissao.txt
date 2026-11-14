@@ -1,0 +1,16 @@
+# Tudo o que o gerar_submissao.py precisa, com Python 3.13.
+#
+# numpy, pandas, scipy e scikit-learn estão nas versões que treinaram os modelos de posse_ml/ e modelo/.
+# Os demais: ANTES DE ENVIAR, troque cada "TODO" pela versão instalada na máquina que gerou o CSV
+#   py -3.13 -m pip freeze | findstr /i "torch ultralytics opencv imageio gdown"
+# PyTorch com GPU (opcional, só acelera a detecção da bola): instale pelo seletor de
+# https://pytorch.org/get-started/locally/ e anote aqui a versão que ficou.
+numpy==2.5.3
+pandas==3.0.5
+scipy==1.18.1
+scikit-learn==1.9.1
+torch            # TODO fixar
+ultralytics      # TODO fixar  (detector de bola do Roboflow; licença AGPL-3.0)
+opencv-python    # TODO fixar
+imageio-ffmpeg   # TODO fixar  (ffmpeg para o apito; dispensável se o ffmpeg estiver no PATH)
+gdown            # TODO fixar  (só para baixar os pesos do detector)
