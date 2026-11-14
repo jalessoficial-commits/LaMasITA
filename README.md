@@ -1,3 +1,57 @@
+# Submissão da equipe LaMasITA
+
+> O restante deste README, a partir de "More than a Hack 2027", é o texto original do desafio.
+
+**O que a submissão faz.** Para cada frame, decide entre H, A, D e X em três camadas, cada uma com a sua pasta:
+
+| camada | pasta | o que faz |
+|---|---|---|
+| bola | `tracking_bola/` | detector de bola do Roboflow (YOLOv8, pesos prontos, inferência local) em todos os frames avaliados, máscara do campo, fusão com o ATD e rastro por Viterbi |
+| bola morta | `analise/` | detector de paradas (versão v5): árvore treinada com rótulos fracos do próprio ATD, apito no áudio, Smart Tagging e regras de reinício |
+| posse H/A | `posse_ml/`, `modelo/campeao_tcn/` | TCN treinada só nos sete jogos abertos da DFL, média de seis sementes, decodificada por Viterbi com a bola morta fixada pelo detector (modo rígido) |
+
+No GT público (5 minutos), o arquivo final tem spellF1 0,739.
+
+**Uso do GT público.** As redes foram treinadas só na DFL e nenhum peso foi ajustado no jogo do desafio. A janela
+pública de 5 minutos foi usada para escolher entre configurações candidatas (rede, épocas, dados de treino, versões
+do detector de bola morta), sem treinar nem ajustar pesos nela. Os números calculados na janela pelo
+`posse_ml/calibrar.py` (`calibracao*.json`) não entram na submissão: no modo rígido eles não mudariam a decodificação,
+e `posse_ml/prever.py` não os usa. Alguns limiares do detector de bola morta foram revistos com uma pequena amostra
+rotulada à mão (vereditos de trechos do 1º tempo no viewer), como o [RULES.md](RULES.md) permite; esses rótulos não
+estão no repositório, e o arquivo não depende deles.
+
+## Reproduzir o arquivo enviado
+
+1. **Python 3.13** e as dependências:
+
+   ```bash
+   py -3.13 -m pip install -r requirements-submissao.txt
+   ```
+
+2. **Dados do desafio** em `data/` (ou `MTAH_DATA_DIR`), no layout do [DATA.md](DATA.md).
+
+3. **Pesos do detector de bola** (do repositório [roboflow/sports](https://github.com/roboflow/sports), `examples/soccer/setup.sh`):
+
+   ```bash
+   gdown -O tracking_bola/pesos/football-ball-detection.pt "https://drive.google.com/uc?id=1isw4wx-MK9h9LMr36VvIWlJD6ppUvw7V"
+   ```
+
+4. **Um comando**, que roda as etapas na ordem e grava `LaMasITA.csv` na raiz, já conferido com o
+   `evaluation/validate_submission.py`:
+
+   ```bash
+   py -3.13 gerar_submissao.py
+   ```
+
+   A detecção da bola leva horas (usa a GPU se o PyTorch tiver CUDA) e pode ser interrompida: rodar de novo
+   continua de onde parou. As outras etapas levam minutos. As etapas e as saídas intermediárias estão descritas no
+   cabeçalho de `gerar_submissao.py`. Tudo o que é derivado dos dados fica fora do Git.
+
+Os detalhes de cada camada, com os testes e o que foi descartado, estão em `tracking_bola/README.md`,
+`analise/` (`paradas.py`, `avaliar_v3.py`, `casar_campeao.py`) e `posse_ml/README.md`.
+
+---
+
 # More than a Hack 2027 — Phase 1: Ball Possession
 
 **Organised by [Metrica Sports](https://metrica-sports.com), [FC Barcelona](https://www.fcbarcelona.com)

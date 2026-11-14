@@ -1,7 +1,7 @@
 """Detector de bola morta v2 x v3 x v4 x v5 (analise/paradas.py, Config() x Config.v3() x .v4() x .v5()).
 
     python analise/avaliar_v3.py              # tabela v2 x v3, casos (gols, 57942, 20636) e rótulos
-    python analise/avaliar_v3.py --exportar   # e grava out/tracking/{D,paradas}_v3.csv
+    python analise/avaliar_v3.py --exportar   # e grava out/tracking/{D,paradas}_{v2,v3,v4,v5}.csv
     python analise/exportar_viewer_tracking.py                       # -> viewer/data/pred_v3.csv, eventos_v3.json
     python analise/comparar_posse.py --d v3 --exportar posse_viterbi_v3   # posse Viterbi com o D v3
     python analise/comparar_posse.py --d v4 --exportar posse_viterbi_v4   # ... e com o D v4
@@ -15,6 +15,9 @@ Gabaritos (nenhum treina nada):
     blocos    os 2 blocos de posse rotulados no viewer (D, H, A)
     manuais   analise/out/rotulos_manuais.csv: erro de início/fim e falso D nos 'viva'
     clipes    analise/out/rotulos_clipes.csv: vereditos do painel "Clipes D" do viewer
+
+Os rótulos à mão (blocos, manuais, clipes) só existem na máquina de quem rotulou e servem só para as
+métricas: sem eles as colunas correspondentes ficam vazias, e os D exportados saem iguais.
 """
 
 import argparse
@@ -92,6 +95,8 @@ def metricas_blocos(d, base):
 
 
 def metricas_manuais(d):
+    if not os.path.exists(RP.OUT):
+        return {}, None
     av = RP.avaliar(RP.carregar(), d)
     viva = av[av.real == "viva"]
     par = av[av.real == "parada"]
@@ -185,7 +190,8 @@ def main():
         avs[nome] = av
         print("\n==", nome)
         print(casos(d, tab).round(3).to_string(index=False))
-        if args.exportar and nome in ("v3", "v4", "v5"):
+        if args.exportar:
+            os.makedirs(OUT, exist_ok=True)
             tab.to_csv(os.path.join(OUT, "paradas_{}.csv".format(nome)), index=False)
             pd.DataFrame({"frame": np.arange(S.N), "morta": d.astype(int)}).to_csv(
                 os.path.join(OUT, "D_{}.csv".format(nome)), index=False)
@@ -197,9 +203,10 @@ def main():
     pd.set_option("display.width", 250, "display.max_columns", 40)
     res = pd.DataFrame(rows).set_index("detector").T
     print("\n", res.round(3).to_string())
-    m = avs["v4"].merge(avs["v5"], on=["id", "categoria", "real"], suffixes=("_v4", "_v5"))
-    print("\nrótulos manuais (v4 x v5):")
-    print(m.round(2).to_string(index=False))
+    if avs["v4"] is not None and avs["v5"] is not None:
+        m = avs["v4"].merge(avs["v5"], on=["id", "categoria", "real"], suffixes=("_v4", "_v5"))
+        print("\nrótulos manuais (v4 x v5):")
+        print(m.round(2).to_string(index=False))
 
 
 if __name__ == "__main__":

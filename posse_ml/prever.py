@@ -94,12 +94,15 @@ def rotular(p, probs, plano=None, pasta=None, adiantar=True, custos=None, parada
     o peso ajustado pelo calibrar --paradas.
     """
     forca = ler_paradas(paradas, p.n) if paradas else None
+    rigido = modo == "rigido" and forca is not None
     calibracao = arquivo_calibracao(paradas) if modo == "suave" else "calibracao.json"
     c, pesos, adi = ajustes(pasta, calibracao)
     c = dict(c, **(custos or {}))
-    extra = extra_da_transmissao(probs[0], plano, pesos, forca if modo == "suave" else None)
+    # No rígido a calibração (ajustada na janela pública) não entra: o CSV fixa viva/morta em todo frame
+    # e o extra só soma o mesmo valor aos dois estados permitidos de cada frame, sem mudar o caminho do
+    # Viterbi. Tirá-lo deixa explícito que a submissão não depende de nada ajustado no GT.
+    extra = None if rigido else extra_da_transmissao(probs[0], plano, pesos, forca if modo == "suave" else None)
     pontos = viterbi.emissoes(*probs, extra_morta=extra)
-    rigido = modo == "rigido" and forca is not None
     rot = viterbi.rotulos(viterbi.decodificar(pontos, p.tempos, c, p.kickoffs, forca if rigido else None))
     if adiantar and not rigido:
         rot = viterbi.adiantar_paradas(rot, p.tempos, adi["inicio"], adi["fim"], p.kickoffs)

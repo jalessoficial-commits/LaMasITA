@@ -16,6 +16,12 @@ candidatos filtrados por uma **máscara do campo de 2 m** e a regra de fusão co
 passou a existir em **72,8%** deles, contra 59,3% do ATD, e a posição foi exportada em coordenadas do campo,
 no formato do ATD, como substituta da bola dele (passos 13 e 14).
 
+> **Qual bola a submissão usa.** A camada de posse (`posse_ml/`) usa o **rastro por Viterbi** do passo 15
+> (`out/viterbi_bola.csv`), calculado sobre os candidatos deste mesmo detector com a máscara de 2 m, e não a
+> fusão. Este documento conclui, só pelas métricas de detecção, que fusão e Viterbi são pontos da mesma troca
+> entre acerto e falso alarme; a escolha do Viterbi veio depois, medida na posse (`posse_ml/README.md`,
+> seções 5.2, 5.3 e 5.5). A fusão continua sendo usada pelo detector de bola morta (`analise/`).
+
 **Resultado no conjunto de teste** (93 frames novos, não usados para escolher nada; tolerância de 40 px):
 
 | | ATD | Modelo final |
@@ -207,7 +213,7 @@ bola original do ATD (`atd_fora_do_jogo`). Antes de gravar, o script imprime a c
 mostrada acima. O arquivo é dado derivado do vídeo, frame a frame: fica em `data/`, fora do Git, e não
 pode ser publicado (RULES.md); a equipe o recebe por fora do repositório ou o regenera com os scripts.
 
-**Passo 15 — Continuidade no tempo: Kalman, Viterbi e limiar mais baixo (`track_temporal.py`, `compare_gaps.py`) — descartados.**
+**Passo 15 — Continuidade no tempo: Kalman, Viterbi e limiar mais baixo (`track_temporal.py`, `compare_gaps.py`).**
 A fusão decide cada frame sozinha. Testamos usar os frames vizinhos, sobre os mesmos candidatos do jogo
 todo (passo 13), em metros no campo:
 
@@ -239,6 +245,11 @@ campeã são pontos da mesma troca entre acerto e falso alarme, com F1 empatado 
 75,4% na validação). Ficamos com a fusão campeã, o ponto conservador: para a posse, uma bola inventada
 (em jogo parado, ou ao lado do jogador errado) tende a custar mais que uma bola faltando, que a camada de
 posse pode atravessar pela estabilidade da posse no tempo.
+
+Essa foi a conclusão da etapa de detecção. Depois, na camada de posse, o rastro do Viterbi se mostrou a melhor
+entrada: bola presente em 83,5% dos frames avaliados (72,8% na fusão), menos lacunas longas com o jogo rolando
+e melhor validação dos modelos de posse (`posse_ml/README.md`, seções 5.2, 5.3 e 5.5). A submissão usa o Viterbi;
+o Kalman ficou descartado.
 
 ## 4. Resultados no conjunto de validação
 
