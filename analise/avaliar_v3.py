@@ -191,6 +191,7 @@ def main():
         print("\n==", nome)
         print(casos(d, tab).round(3).to_string(index=False))
         if args.exportar:
+            os.makedirs(OUT, exist_ok=True)
             tab.to_csv(os.path.join(OUT, "paradas_{}.csv".format(nome)), index=False)
             pd.DataFrame({"frame": np.arange(S.N), "morta": d.astype(int)}).to_csv(
                 os.path.join(OUT, "D_{}.csv".format(nome)), index=False)
