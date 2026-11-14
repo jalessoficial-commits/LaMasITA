@@ -20,7 +20,8 @@ Etapas (cada uma é um script do repositório, rodado com este mesmo Python):
                                            sinais do detector de bola morta (ATD, homografia, apito)
  5. analise/avaliar_v3.py --exportar       detector de bola morta: D v2 (entrada do posse_ml) e D v5
  6. python -m posse_ml                     H/A: TCN (média de seis sementes, treinada só na DFL),
-                                           modelo/campeao_tcn, bola morta do D v2 em modo rígido
+                                           modelo/campeao_tcn, bola morta do D v2 em modo rígido;
+                                           sem o vídeo de transmissão, que no rígido não muda nada
  7. analise/casar_campeao.py               D v5 + H/A da TCN, posses < 1 s engolidas
  8. <time>.csv na raiz, conferido com evaluation/validate_submission.py
 
@@ -178,7 +179,7 @@ def main():
     camp = os.path.join(res, "campeao_tcn.csv")
     rodar("6. posse H/A: TCN, bola morta v2 rígida",
           ["-m", "posse_ml", "--instancia", "viterbi", "--modelos", "modelo/campeao_tcn",
-           "--paradas", os.path.relpath(d_v2, RAIZ), "--modo-paradas", "rigido", "--out", os.path.relpath(camp, RAIZ)],
+           "--paradas", os.path.relpath(d_v2, RAIZ), "--modo-paradas", "rigido", "--sem-transmissao", "--out", os.path.relpath(camp, RAIZ)],
           [camp], True)           # sempre: evaluation/results/campeao_tcn.csv está no Git, então nunca falta
 
     casado = os.path.join(res, "casado_tcn_v5.csv")

@@ -43,9 +43,17 @@ estão no repositório, e o arquivo não depende deles.
    py -3.13 gerar_submissao.py
    ```
 
+   No Linux ou no Mac, use `python3.13` no lugar de `py -3.13`.
+
    A detecção da bola leva horas (usa a GPU se o PyTorch tiver CUDA) e pode ser interrompida: rodar de novo
    continua de onde parou. As outras etapas levam minutos. As etapas e as saídas intermediárias estão descritas no
    cabeçalho de `gerar_submissao.py`. Tudo o que é derivado dos dados fica fora do Git.
+
+**O que foi conferido.** Refazendo do rastro da bola em diante (`gerar_submissao.py --conferir`), o arquivo sai
+idêntico byte a byte (mesmo sha256) na máquina que gerou a submissão. A detecção da bola, que levou cerca de 27 h
+numa GPU, não foi refeita: uma rede em GPU pode variar levemente com a placa e o driver, e uma detecção perto do
+limiar de confiança que mude de lado se propaga a alguns frames do arquivo final. O pipeline usa só o vídeo
+tático; o vídeo de transmissão não é lido.
 
 Os detalhes de cada camada, com os testes e o que foi descartado, estão em `tracking_bola/README.md`,
 `analise/` (`paradas.py`, `avaliar_v3.py`, `casar_campeao.py`) e `posse_ml/README.md`.
