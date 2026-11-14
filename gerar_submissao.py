@@ -3,6 +3,8 @@
     python gerar_submissao.py                    # tudo, na ordem; o que já foi feito é pulado
     python gerar_submissao.py --refazer          # refaz todas as etapas (a detecção da bola retoma de onde parou)
     python gerar_submissao.py --time LaMasITA    # nome do arquivo final (padrão: LaMasITA)
+    python gerar_submissao.py --conferir         # roda duas vezes e confere que o CSV sai idêntico;
+                                                 # também anota em requirements-submissao.txt as versões instaladas
 
 Pré-requisitos (README.md, seção "Submissão da equipe"): os dados em data/ (ou $MTAH_DATA_DIR), as
 dependências de requirements-submissao.txt e os pesos do detector de bola em
@@ -61,11 +63,92 @@ def conferir_entradas():
         sys.exit("faltam os pesos do detector de bola em {} (README.md, seção 'Submissão da equipe')".format(pesos))
 
 
+def fixar_versoes():
+    """Troca cada linha '# TODO fixar' de requirements-submissao.txt pela versão instalada neste Python.
+    Pacote não instalado: a linha sai (o pipeline rodou sem ele, então não é necessário)."""
+    from importlib import metadata
+    arq = caminho("requirements-submissao.txt")
+    with open(arq, encoding="utf-8") as h:
+        linhas = h.read().splitlines()
+    saida = []
+    for linha in linhas:
+        if "TODO fixar" not in linha or linha.lstrip().startswith("#"):
+            saida.append(linha)
+            continue
+        pacote = linha.split()[0]
+        nota = linha.split("TODO fixar", 1)[1].strip()
+        try:
+            versao = metadata.version(pacote).split("+")[0]      # 2.x.y+cu128 -> 2.x.y
+        except metadata.PackageNotFoundError:
+            if pacote == "gdown":                  # só baixa os pesos; fica sem versão
+                saida.append("gdown" + ("   # " + nota if nota else ""))
+            else:
+                print("   {}: não instalado, linha removida".format(pacote))
+            continue
+        saida.append("{}=={}{}".format(pacote, versao, "   # " + nota if nota else ""))
+        print("   {}=={}".format(pacote, versao))
+    with open(arq, "w", encoding="utf-8", newline="\n") as h:
+        h.write("\n".join(saida) + "\n")
+
+
+def resumo(arq):
+    import hashlib
+    with open(arq, "rb") as h:
+        return hashlib.sha256(h.read().replace(b"\r\n", b"\n")).hexdigest()
+
+
+def conferir(time):
+    """Refaz do rastro da bola em diante (tudo menos a detecção, que leva horas) e compara o CSV final."""
+    final = caminho("{}.csv".format(time))
+    if not os.path.isfile(final):
+        subprocess.run([PY, __file__, "--time", time], cwd=RAIZ, check=True)
+    antes = resumo(final)
+    guardados = []
+    alvos = [caminho("tracking_bola", "out", "viterbi_bola.csv"), caminho("analise", "out", "tracking"),
+             caminho("viewer", "data", "features_tactical.bin"),
+             caminho("viewer", "data", "features_coletivas_tactical.bin")]
+    for alvo in alvos:
+        if os.path.exists(alvo + ".conferir_bak"):
+            sys.exit("já existe {}.conferir_bak: apague ou restaure antes de conferir".format(alvo))
+    try:
+        for alvo in alvos:                         # feche o viewer antes: no Windows ele segura esses arquivos
+            if os.path.exists(alvo):
+                os.rename(alvo, alvo + ".conferir_bak")
+                guardados.append((alvo, alvo + ".conferir_bak"))
+        subprocess.run([PY, __file__, "--time", time], cwd=RAIZ, check=True)
+        depois = resumo(final)
+    except BaseException:
+        for alvo, copia in guardados:              # deu errado: volta o que havia
+            if os.path.isdir(alvo):
+                shutil.rmtree(alvo)
+            elif os.path.exists(alvo):
+                os.remove(alvo)
+            os.rename(copia, alvo)
+        raise
+    for alvo, copia in guardados:
+        shutil.rmtree(copia) if os.path.isdir(copia) else os.remove(copia)
+    print("\n== versões instaladas -> requirements-submissao.txt")
+    fixar_versoes()
+    print("\n== conferência\n   antes : {}\n   depois: {}".format(antes, depois))
+    if antes == depois:
+        print("   IGUAL: o repositório regenera exatamente {}".format(os.path.basename(final)))
+    else:
+        print("   DIFERENTE: algum arquivo intermediário era de outra versão. O {} de agora é o que o\n"
+              "   repositório regenera; rode --conferir de novo para confirmar que ele se repete.".format(
+                  os.path.basename(final)))
+        sys.exit(1)
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--time", default="LaMasITA", help="nome da equipe = nome do CSV final")
     ap.add_argument("--refazer", action="store_true", help="refaz as etapas mesmo com as saídas presentes")
+    ap.add_argument("--conferir", action="store_true",
+                    help="refaz do rastro da bola em diante, compara o CSV e fixa as versões das dependências")
     args = ap.parse_args()
+    if args.conferir:
+        conferir_entradas()
+        return conferir(args.time)
     r = args.refazer
     conferir_entradas()
 
