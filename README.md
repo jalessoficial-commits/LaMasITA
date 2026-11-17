@@ -16,9 +16,10 @@ No GT público (5 minutos), o arquivo final tem spellF1 0,739.
 pública de 5 minutos foi usada para escolher entre configurações candidatas (rede, épocas, dados de treino, versões
 do detector de bola morta), sem treinar nem ajustar pesos nela. Os números calculados na janela pelo
 `posse_ml/calibrar.py` (`calibracao*.json`) não entram na submissão: no modo rígido eles não mudariam a decodificação,
-e `posse_ml/prever.py` não os usa. Alguns limiares do detector de bola morta foram revistos com uma pequena amostra
-rotulada à mão (vereditos de trechos do 1º tempo no viewer), como o [RULES.md](RULES.md) permite; esses rótulos não
-estão no repositório, e o arquivo não depende deles.
+e `posse_ml/prever.py` não os usa. Os parâmetros da fusão da bola e do detector de bola morta foram escolhidos à mão,
+comparando as configurações no viewer. Pequenas amostras rotuladas à mão (frames com a bola, vereditos de trechos
+do 1º tempo, dois blocos de posse) serviram só para medir o desempenho, sem treinar nem escolher nada; esses rótulos
+não estão no repositório, e o arquivo não depende deles.
 
 ## Reproduzir o arquivo enviado
 
