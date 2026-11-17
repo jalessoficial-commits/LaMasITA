@@ -6,7 +6,7 @@ eval_atd.py e check_projection.py (reaproveita o código deles). Precisa de ultr
     python tracking_bola/run_champion_full.py --limit-frames 200     # teste de tempo: só 200 frames
     python tracking_bola/run_champion_full.py                        # jogo todo (retoma de onde parou)
 
-O que faz, com os parâmetros escolhidos nos frames anotados:
+O que faz, com os parâmetros escolhidos à mão (comparando as saídas no viewer):
   1. DETECÇÃO (lenta, com salvamento e retomada): o detector de bola do Roboflow (YOLOv8, classe 0) em
      ladrilhos de 640x640 com 20% de sobreposição, em cada frame dos dois tempos avaliados
      (games.half_video_blocks: 158.857 frames). Todos os candidatos com conf >= --conf vão para

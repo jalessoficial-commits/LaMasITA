@@ -1,4 +1,4 @@
-"""Ferramenta de anotação da bola: cria o conjunto de validação feito à mão.
+"""Ferramenta de anotação da bola: cria os frames anotados à mão usados só para conferir que o rastreador funciona.
 
 Colocar em tracking_bola/ (um nível abaixo da raiz, onde está o games.py). Precisa de numpy e
 opencv-python (a versão com janela, não a "headless"):
@@ -8,7 +8,7 @@ opencv-python (a versão com janela, não a "headless"):
     python tracking_bola/annotate_ball.py --n 500 --seed 0
 
 Conjunto de TESTE separado (frames 301 a 400 da mesma lista, garantidamente diferentes dos 300 primeiros),
-num arquivo próprio, para medir o modelo final em frames que não foram usados para escolher nada:
+num arquivo próprio, para conferir o modelo final em frames novos (nenhum frame anotado é usado para escolher nada):
 
     python tracking_bola/annotate_ball.py --start 300 --n 400 --out tracking_bola/out/annotations/ball_annotations_teste.csv
 

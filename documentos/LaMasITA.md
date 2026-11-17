@@ -64,7 +64,7 @@ From the same masked detections we build **two ball tracks, each used by a diffe
 The per-frame fusion with the ATD was the first tracker (detector alone if confidence ≥ 0.8 where the ATD has
 no ball; where it has one, the detector refines it within 40 px, overrides it with confidence ≥ 0.8, or the
 ATD is kept). Its parameters were chosen by hand, comparing configurations visually in our viewer; its
-performance was measured on 93 hand-annotated frames (Section 5):
+a check on 93 hand-annotated frames, done only to see it working outside the public window (Section 6):
 
 | test set, 40 px tolerance | ATD | fusion |
 |---|---|---|
@@ -84,7 +84,7 @@ with the ball in play (fusion 59, ATD 51). Possession models built on it validat
 on the DFL (spellF1 0.596 against 0.580) and on the public window (0.690 against 0.662, trees).
 The dead-ball layer keeps the fusion, and there the ATD ball comes first: our detector projects the ball
 onto the pitch through the homography, so a ball in the air appears displaced, which the ATD ball is not.
-The annotated frames were used only to measure performance; none of them is an output of the system.
+The annotated frames were used only to check that the system was working; none of them is an output of the system.
 
 ### 1.2 Dead ball (`analise/`)
 
@@ -177,13 +177,15 @@ the pipeline does not read the broadcast files.
 **External.** Roboflow ball detector weights (public); Sportec Open DFL dataset (Bassek et al., 2025,
 CC-BY 4.0), the only training data of the possession network.
 
-Tried and dropped, with the number that decided it (possession rows: spellF1 on the public window):
+Tried and dropped. Possession rows: spellF1 on the public window, the number that decided it (Section 5).
+Ball and dead-ball rows: what we observed; the choice was made by hand in our viewer, and the hand-annotated
+figures were only a check (Section 6):
 
 | what | result | why dropped |
 |---|---|---|
 | YOLOv8 (COCO, `sports ball`), no training | did not beat the ATD | COCO has almost no small balls in open play |
 | FootAndBall, no training | ≈ 1% hit rate | barely responds to a ball this small |
-| WASB-SBDT fused with the ATD | F1 60.6% vs 73.3% (validation) | many far errors; Roboflow recovers twice as much where the ATD is blind |
+| WASB-SBDT fused with the ATD | F1 60.6% vs 73.3% (hand-annotated check) | many far errors; Roboflow recovers twice as much where the ATD is blind |
 | Kalman ball track | lowest F1; worse where the ATD has a ball | the track sticks to wrong objects |
 | CART and 2-state HMM for dead ball | CART relearned the weak-label rule; HMM stuck in D | uncalibrated probabilities |
 | Heuristic possession (`posse/`: nearest player, touch as a necessary condition) | 0.586 | predicts 11 possessions against 17; cannot tell a short possession from a touch the GT ignores |
@@ -208,32 +210,41 @@ Tried and dropped, with the number that decided it (possession rows: spellF1 on 
 | **submission: + dead ball v5, possessions < 1 s absorbed** | **0.739** | **0.932** | 16 |
 
 The last step does not move the public window, whose four dead-ball segments were already right. It was
-adopted for the rest of the match; its effect was measured on two 5-minute blocks labelled by hand in our
-viewer, used only as a metric: there, dead ball v4 with the short possessions absorbed took spellF1 from 0.550
+adopted for the rest of the match; we checked it was working on two 5-minute blocks labelled by hand in our
+viewer, outside the public window: there, dead ball v4 with the short possessions absorbed took spellF1 from 0.550
 to 0.687 and macroF1 from 0.832 to 0.870, and v5 took macroF1 to 0.889.
 
 On DFL leave-one-match-out validation the six-seed TCN scores spellF1 0.621 and macroF1 0.916. The DFL
 labels change possession more often than the challenge's (≈ 5 possessions per minute against 3.4), so this
 is not the same scale as the public window.
 
-## 5. What the public ground truth and hand labels were used for
+## 5. What the public ground truth was used for
 
-- **Never used for training.** No weight of any model was fitted on the challenge match.
+- **Never used to fit or calibrate the submitted system.** No weight of any model and no parameter of the
+  submitted pipeline was fitted or calibrated on the public window.
 - **Used to choose between candidate configurations** (network type, epochs, training data, versions of the
   dead-ball detector). For the networks the rule was fixed beforehand: mean spellF1 over seeds, differences
   under 0.03 are a tie, broken by macroF1. This makes the public-window number somewhat optimistic.
-- The values that `posse_ml/calibrar.py` fits on the public window (weight of the broadcast evidence,
-  advance of stoppage borders) are **not used by the submission**: in rigid mode they cannot change the
-  decoding (`posse_ml/testes/test_rigido.py`).
-- **Small hand-labelled samples, used only to measure performance:** 292 + 93 frames with the ball
+- **Calibration on the window happened only in abandoned paths.** The values that `posse_ml/calibrar.py`
+  fits on the public window (weight of the broadcast evidence, weights of the soft dead-ball mode, advance of
+  stoppage borders) belong to the soft mode, which was dropped: in the rigid mode used by the submission
+  they cannot change the decoding (`posse_ml/testes/test_rigido.py`). The 2 s limit used to derive
+  possession labels for the Metrica open matches was set looking at the possession durations of the public
+  window; training on Metrica was also dropped (Section 3).
+
+## 6. What the hand-labelled samples were used for
+
+- **Only to check that the system was working outside the public window:** 292 + 93 frames with the ball
   position; start and end of a sample of stoppages, and verdicts on dead-ball clips of the first half; two
   5-minute blocks of possession. They trained nothing and chose nothing: the parameters of the ball fusion
   and of the dead-ball versions were set by hand, comparing configurations visually in our viewer, and the
-  labels only reported how well each implemented version worked. None is in the repository and the
-  submitted file does not depend on them.
-- No script sends match data off the machine; the only network access downloads public weights and open datasets.
+  labels only served to inspect each implemented version working outside the public window.
+- None is in the repository and the submitted file does not depend on them.
 
-## 6. Limitations
+No script sends match data off the machine; the only network access downloads public weights and open
+datasets.
+
+## 7. Limitations
 
 - **The full-match score is unknown to us.** The public window has 17 possessions: one more or one fewer
   moves spellF1 by ≈ 0.06, and the scorer's bootstrap gives ≈ 0.45–0.85 for every version of `posse_ml`.
@@ -254,7 +265,7 @@ is not the same scale as the public window.
 With more time: handle the aerial ball explicitly; sharpen the frame of each change of possession;
 calibrate the dead-ball detector on more matches.
 
-## 7. Reproduction
+## 8. Reproduction
 
 Python 3.13; the match data in `data/` as described in DATA.md.
 

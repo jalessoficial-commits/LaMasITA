@@ -40,7 +40,8 @@ spellF1 0,690 nos dois; macroF1 0,941 (suave) e 0,931 (rígido).
    sai para "viva com X". Antes do kickoff a bola é morta; no segundo depois dele, viva.
 7. **Calibração na janela pública** (`calibrar.py`). Só o que a DFL não ensina: o peso da
    transmissão (e, no modo suave, do detector de paradas) na bola morta, e quanto adiantar as
-   bordas das paradas, que com a nossa bola tendem a sair atrasadas.
+   bordas das paradas, que com a nossa bola tendem a sair atrasadas. Não entra no modo rígido, o
+   usado na submissão (`testes/test_rigido.py`).
 8. **Bola morta de fora** (opcional, `--paradas`). No modo **rígido**, a bola morta é a do detector
    de paradas, e os modelos só decidem de quem é a bola viva e quem repõe a parada. No modo
    **suave**, o detector é mais uma evidência de bola morta, somada ao modelo e à TV.
@@ -467,8 +468,9 @@ submissão leva poucos minutos com o ATD já no cache.
   o rótulo da DFL, que troca de posse com muito mais frequência que o do desafio. Não é a mesma
   régua da janela.
 - **Ajuste na janela:** o peso da TV, o do detector de paradas (modo suave) e o adiantamento das
-  paradas são ajustados nos mesmos 5 minutos em que são avaliados. Isso é permitido (o GT público
-  foi publicado para isso), mas deixa o número da janela um pouco otimista.
+  paradas são ajustados nos mesmos 5 minutos em que são avaliados, o que deixa o número da janela
+  um pouco otimista. Isso só vale para os modos descartados: no rígido, o da submissão, nada é ajustado
+  na janela.
 
 | versão | ajustado na janela pública |
 |---|---|
