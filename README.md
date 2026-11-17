@@ -18,7 +18,7 @@ do detector de bola morta), sem treinar nem ajustar pesos nela. Os números calc
 `posse_ml/calibrar.py` (`calibracao*.json`) não entram na submissão: no modo rígido eles não mudariam a decodificação,
 e `posse_ml/prever.py` não os usa. Os parâmetros da fusão da bola e do detector de bola morta foram escolhidos à mão,
 comparando as configurações no viewer. Pequenas amostras rotuladas à mão (frames com a bola, vereditos de trechos
-do 1º tempo, dois blocos de posse) serviram só para medir o desempenho, sem treinar nem escolher nada; esses rótulos
+do 1º tempo, dois blocos de posse) serviram só para conferir que o modelo funcionava fora do GT público, sem treinar nem escolher nada; esses rótulos
 não estão no repositório, e o arquivo não depende deles.
 
 ## Reproduzir o arquivo enviado

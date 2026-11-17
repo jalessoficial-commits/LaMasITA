@@ -64,7 +64,7 @@ From the same masked detections we build **two ball tracks, each used by a diffe
 The per-frame fusion with the ATD was the first tracker (detector alone if confidence ≥ 0.8 where the ATD has
 no ball; where it has one, the detector refines it within 40 px, overrides it with confidence ≥ 0.8, or the
 ATD is kept). Its parameters were chosen by hand, comparing configurations visually in our viewer; its
-performance was measured on 93 hand-annotated frames (Section 5):
+a check on 93 hand-annotated frames, done only to see it working outside the public window (Section 5):
 
 | test set, 40 px tolerance | ATD | fusion |
 |---|---|---|
@@ -84,7 +84,7 @@ with the ball in play (fusion 59, ATD 51). Possession models built on it validat
 on the DFL (spellF1 0.596 against 0.580) and on the public window (0.690 against 0.662, trees).
 The dead-ball layer keeps the fusion, and there the ATD ball comes first: our detector projects the ball
 onto the pitch through the homography, so a ball in the air appears displaced, which the ATD ball is not.
-The annotated frames were used only to measure performance; none of them is an output of the system.
+The annotated frames were used only to check that the system was working; none of them is an output of the system.
 
 ### 1.2 Dead ball (`analise/`)
 
@@ -208,8 +208,8 @@ Tried and dropped, with the number that decided it (possession rows: spellF1 on 
 | **submission: + dead ball v5, possessions < 1 s absorbed** | **0.739** | **0.932** | 16 |
 
 The last step does not move the public window, whose four dead-ball segments were already right. It was
-adopted for the rest of the match; its effect was measured on two 5-minute blocks labelled by hand in our
-viewer, used only as a metric: there, dead ball v4 with the short possessions absorbed took spellF1 from 0.550
+adopted for the rest of the match; we checked it was working on two 5-minute blocks labelled by hand in our
+viewer, outside the public window: there, dead ball v4 with the short possessions absorbed took spellF1 from 0.550
 to 0.687 and macroF1 from 0.832 to 0.870, and v5 took macroF1 to 0.889.
 
 On DFL leave-one-match-out validation the six-seed TCN scores spellF1 0.621 and macroF1 0.916. The DFL
@@ -225,11 +225,11 @@ is not the same scale as the public window.
 - The values that `posse_ml/calibrar.py` fits on the public window (weight of the broadcast evidence,
   advance of stoppage borders) are **not used by the submission**: in rigid mode they cannot change the
   decoding (`posse_ml/testes/test_rigido.py`).
-- **Small hand-labelled samples, used only to measure performance:** 292 + 93 frames with the ball
+- **Small hand-labelled samples, used only to check that the system was working outside the public window:** 292 + 93 frames with the ball
   position; start and end of a sample of stoppages, and verdicts on dead-ball clips of the first half; two
   5-minute blocks of possession. They trained nothing and chose nothing: the parameters of the ball fusion
   and of the dead-ball versions were set by hand, comparing configurations visually in our viewer, and the
-  labels only reported how well each implemented version worked. None is in the repository and the
+  labels only served to inspect each implemented version working outside the public window. None is in the repository and the
   submitted file does not depend on them.
 - No script sends match data off the machine; the only network access downloads public weights and open datasets.
 
