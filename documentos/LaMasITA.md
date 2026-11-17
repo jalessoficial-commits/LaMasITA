@@ -64,7 +64,7 @@ From the same masked detections we build **two ball tracks, each used by a diffe
 The per-frame fusion with the ATD was the first tracker (detector alone if confidence ≥ 0.8 where the ATD has
 no ball; where it has one, the detector refines it within 40 px, overrides it with confidence ≥ 0.8, or the
 ATD is kept). Its parameters were chosen by hand, comparing configurations visually in our viewer; its
-a check on 93 hand-annotated frames, done only to see it working outside the public window (Section 5):
+a check on 93 hand-annotated frames, done only to see it working outside the public window (Section 6):
 
 | test set, 40 px tolerance | ATD | fusion |
 |---|---|---|
@@ -216,24 +216,33 @@ On DFL leave-one-match-out validation the six-seed TCN scores spellF1 0.621 and 
 labels change possession more often than the challenge's (≈ 5 possessions per minute against 3.4), so this
 is not the same scale as the public window.
 
-## 5. What the public ground truth and hand labels were used for
+## 5. What the public ground truth was used for
 
-- **Never used for training.** No weight of any model was fitted on the challenge match.
+- **Never used to fit or calibrate the submitted system.** No weight of any model and no parameter of the
+  submitted pipeline was fitted or calibrated on the public window.
 - **Used to choose between candidate configurations** (network type, epochs, training data, versions of the
   dead-ball detector). For the networks the rule was fixed beforehand: mean spellF1 over seeds, differences
   under 0.03 are a tie, broken by macroF1. This makes the public-window number somewhat optimistic.
-- The values that `posse_ml/calibrar.py` fits on the public window (weight of the broadcast evidence,
-  advance of stoppage borders) are **not used by the submission**: in rigid mode they cannot change the
-  decoding (`posse_ml/testes/test_rigido.py`).
-- **Small hand-labelled samples, used only to check that the system was working outside the public window:** 292 + 93 frames with the ball
+- **Calibration on the window happened only in abandoned paths.** The values that `posse_ml/calibrar.py`
+  fits on the public window (weight of the broadcast evidence, weights of the soft dead-ball mode, advance of
+  stoppage borders) belong to the soft mode, which was dropped: in the rigid mode used by the submission
+  they cannot change the decoding (`posse_ml/testes/test_rigido.py`). The 2 s limit used to derive
+  possession labels for the Metrica open matches was set looking at the possession durations of the public
+  window; training on Metrica was also dropped (Section 3).
+
+## 6. What the hand-labelled samples were used for
+
+- **Only to check that the system was working outside the public window:** 292 + 93 frames with the ball
   position; start and end of a sample of stoppages, and verdicts on dead-ball clips of the first half; two
   5-minute blocks of possession. They trained nothing and chose nothing: the parameters of the ball fusion
   and of the dead-ball versions were set by hand, comparing configurations visually in our viewer, and the
-  labels only served to inspect each implemented version working outside the public window. None is in the repository and the
-  submitted file does not depend on them.
-- No script sends match data off the machine; the only network access downloads public weights and open datasets.
+  labels only served to inspect each implemented version working outside the public window.
+- None is in the repository and the submitted file does not depend on them.
 
-## 6. Limitations
+No script sends match data off the machine; the only network access downloads public weights and open
+datasets.
+
+## 7. Limitations
 
 - **The full-match score is unknown to us.** The public window has 17 possessions: one more or one fewer
   moves spellF1 by ≈ 0.06, and the scorer's bootstrap gives ≈ 0.45–0.85 for every version of `posse_ml`.
@@ -254,7 +263,7 @@ is not the same scale as the public window.
 With more time: handle the aerial ball explicitly; sharpen the frame of each change of possession;
 calibrate the dead-ball detector on more matches.
 
-## 7. Reproduction
+## 8. Reproduction
 
 Python 3.13; the match data in `data/` as described in DATA.md.
 
