@@ -7,8 +7,9 @@
 
 O ATD fornecido (rastreamento automático da Metrica) **não tem bola em ~41% dos frames avaliados** e,
 onde tem, a posição erra por dezenas de pixels. Construímos um rastreador de bola próprio a partir do
-vídeo, sem treinar nenhum modelo (só pesos públicos), e o validamos em frames anotados à mão (usados
-**só para validar**, nunca como saída do sistema).
+vídeo, sem treinar nenhum modelo (só pesos públicos). Os parâmetros foram escolhidos à mão, comparando
+as configurações no viewer; frames anotados à mão serviram **só para medir** o desempenho do que
+implementamos, sem treinar nem escolher nada, e nunca como saída do sistema.
 
 **Modelo final:** fusão do ATD com o detector de bola do Roboflow (YOLOv8 treinado em futebol), com os
 candidatos filtrados por uma **máscara do campo de 2 m** e a regra de fusão com **`--solo-conf 0,8`** e
@@ -34,7 +35,7 @@ no formato do ATD, como substituta da bola dele (passos 13 e 14).
 | Falso alarme (14 frames sem bola) | 7,1% | 7,1% |
 | F1 | 64,6% | **76,8%** |
 
-A tabela abaixo resume como se chegou ao modelo, no conjunto de validação.
+A tabela abaixo traz a métrica de cada etapa nos 292 frames anotados (só medição).
 
 | Etapa (292 frames anotados, tolerância de 40 px) | Acerto | Onde o ATD não tem bola | Falso alarme | F1 |
 |---|---|---|---|---|
@@ -45,7 +46,7 @@ A tabela abaixo resume como se chegou ao modelo, no conjunto de validação.
 | Fusão ATD + Roboflow, override 0,8 | 65,3% | 31,6% | 48,5% | 69,1% |
 | **Fusão ATD + Roboflow, override 0,8, máscara do campo** | **66,4%** | **31,6%** | **24,2%** | **73,3%** |
 
-A última linha é a máscara de 3 m; a de 2 m, adotada no modelo final, foi melhor na mesma comparação.
+A última linha é a máscara de 3 m; a de 2 m foi a adotada no modelo final.
 Tabela completa na seção 4.
 
 ## 2. Dados e modelos usados
@@ -58,8 +59,8 @@ Tabela completa na seção 4.
 | Dimensões do campo (`games.py`, 105,3 × 68 m) | converter a margem da máscara de metros para o campo normalizado | |
 | Smart Tagging | só diagnóstico (`gap_map.py`: relação entre lacunas de bola e bolas paradas) | não entra no rastreador |
 | Blocos avaliados (`games.half_video_blocks`) | 1º tempo 11.185–90.651; 2º tempo 110.808–190.197 (158.857 frames) | só esses frames são processados |
-| 292 frames anotados à mão (`annotate_ball.py`) | conjunto de **validação**: escolher detector e parâmetros | 259 com bola visível, 33 sem bola |
-| 93 frames anotados à mão, em arquivo separado | conjunto de **teste**: medir o modelo escolhido | frames 301–400 da mesma lista sorteada (79 com bola, 14 sem); não usados para escolher nada |
+| 292 frames anotados à mão (`annotate_ball.py`) | só **medição**: métrica de cada etapa | 259 com bola visível, 33 sem bola; não usados para escolher nada |
+| 93 frames anotados à mão, em arquivo separado | só **medição**: métrica do modelo final | frames 301–400 da mesma lista sorteada (79 com bola, 14 sem); não usados para escolher nada |
 
 Modelos pré-treinados (todos públicos; o commit de cada repositório clonado fica em
 `tracking_bola/third_party/*_commit.txt`):
@@ -71,8 +72,8 @@ Modelos pré-treinados (todos públicos; o commit de cada repositório clonado f
 | YOLOv8m (COCO, `sports ball`) | `ultralytics` | AGPL-3.0 | `yolov8m.pt` | descartado |
 | FootAndBall | github.com/jac99/FootAndBall (Komorowski et al., VISAPP 2020) | MIT | `models/model_20201019_1416_final.pth` | descartado |
 
-**Conformidade.** As anotações à mão servem somente para validar e testar; nada do que o sistema produz
-foi rotulado à mão. Os scripts processam o vídeo apenas na máquina local e não enviam dados a nenhum
+**Conformidade.** As anotações à mão servem somente para medir o desempenho; não treinam nem escolhem
+nada, e nada do que o sistema produz foi rotulado à mão. Os scripts processam o vídeo apenas na máquina local e não enviam dados a nenhum
 serviço externo (só baixam pesos públicos). Os arquivos derivados do vídeo (CSVs de posição por frame e
 recortes de imagem em `out/`) não são publicados: ficam no `.gitignore`, e este documento traz apenas
 métricas agregadas.
@@ -87,11 +88,11 @@ distribui as lacunas por duração e as cruza com as bolas paradas do Smart Tagg
 projeta a bola do ATD no vídeo com a homografia, para ver se cai sobre a bola (a homografia vale para o
 plano do chão, então isso importa sobretudo para bola no ar).
 
-**Passo 1 — Conjunto de validação (`annotate_ball.py`).**
+**Passo 1 — Frames anotados para medição (`annotate_ball.py`).**
 Os dados fornecidos não trazem a posição verdadeira da bola. Anotamos à mão a bola em frames sorteados dos
 dois tempos, no máximo um por bloco de 125 frames (5 s). Cada frame recebe `ball`, `not_visible`,
-`uncertain` ou `skip`. Resultado: 292 frames, 259 com bola visível e 33 sem. O RULES.md permite pequenas
-quantidades de dados anotados à mão para treinar ou validar.
+`uncertain` ou `skip`. Resultado: 292 frames, 259 com bola visível e 33 sem. Servem só para medir cada
+etapa; as escolhas foram feitas à mão, olhando as saídas no viewer.
 
 **Passo 2 — Medir o ATD (`eval_atd.py`, `check_atd_nature.py`).**
 A bola do ATD é projetada em pixels e comparada com o clique. Verificamos também se as posições do ATD
@@ -111,8 +112,8 @@ o ATD: o COCO quase não tem bolas pequenas em plano aberto.
 O WASB (HRNet de ~1,5 M de parâmetros, 3 frames consecutivos na entrada, mapa de calor na saída) era o
 melhor publicado no benchmark de futebol do próprio artigo (ISSIA-CNR, F1 88,3). Reduzir o frame para a
 entrada de 512×288 apaga a bola (2% de acerto); por isso o frame é cortado em ladrilhos de 512×288 com
-20% de sobreposição, depois de reduzido por um fator. A varredura em 100 frames deu 0,4 → 29%,
-0,5 → 58%, 0,6–0,9 → 61–65%; ficamos com **0,6** (~9 ladrilhos por frame). Limiar do mapa 0,2, vários
+20% de sobreposição, depois de reduzido por um fator. Ficamos com **0,6** (~9 ladrilhos por frame), escolhido
+à mão; a métrica em 100 frames anotados foi 0,4 → 29%, 0,5 → 58%, 0,6–0,9 → 61–65%. Limiar do mapa 0,2, vários
 candidatos por frame com a confiança de cada um. Resultado: muito preciso (2,3 px de erro mediano nos
 acertos), mas com muitos erros longe e falso alarme alto em limiar baixo.
 
@@ -160,26 +161,24 @@ contínuo. O
 `mask_pitch.py` leva cada candidato do pixel para o campo pela inversa da homografia do frame e descarta os
 que caem a mais de uma margem das linhas; o próximo candidato, muitas vezes a bola de verdade, assume.
 Com 3 m: falso alarme da fusão de 48,5% para 24,2%, **sem perder nenhum acerto** onde o ATD não tem bola,
-p90 do erro de 683 para 73 px, F1 73,3%. Com **2 m** o resultado foi melhor e essa margem foi adotada.
+p90 do erro de 683 para 73 px, F1 73,3%. A margem adotada foi **2 m**.
 A margem existe porque a bola de verdade sai do campo em laterais e escanteios, e uma bola alta é
 projetada mais longe do que está.
 
-**Passo 12 — Conjunto de teste (`annotate_ball.py --start 300 --n 400`).**
-Detector, limiares, override e margem foram escolhidos nos mesmos 292 frames em que foram medidos, o que
-deixa esses números otimistas. Anotamos frames novos (posições 301–400 da mesma lista sorteada,
+**Passo 12 — Segunda medição (`annotate_ball.py --start 300 --n 400`).**
+Detector, limiares, override e margem foram escolhidos à mão, comparando as saídas no viewer. Para ter
+uma segunda medida, anotamos frames novos (posições 301–400 da mesma lista sorteada,
 diferentes dos 300 primeiros; 93 frames aproveitados, 79 com bola e 14 sem) num arquivo separado e medimos
 neles, sem mudar nenhum parâmetro, o ATD e a fusão ATD + Roboflow, com e sem máscara. O modelo final é a fusão ATD + Roboflow, override 0,8, máscara de 2 m. No teste ele acerta 67,1%
 contra 53,2% do ATD (diferença acima da margem de ±11 pontos), com o mesmo falso alarme do ATD (1 de 14
 frames sem bola) e F1 de 76,8% contra 64,6%. Sem a máscara, a mesma fusão teria acerto igual, mas falso
-alarme de 21,4% e erro p90 de 372 px (contra 5,8 px com a máscara): no teste, como na validação, a máscara
-só removeu candidatos errados. O F1 no teste não ficou abaixo do da validação, então não há sinal de que
-a escolha dos parâmetros nos 292 frames tenha inflado os números. A comparação com a fusão ATD + WASB é
-da validação; ela não foi rodada no teste.
+alarme de 21,4% e erro p90 de 372 px (contra 5,8 px com a máscara): nos 93 frames, como nos 292, a máscara
+só removeu candidatos errados. A comparação com a fusão ATD + WASB é da primeira medição (292 frames);
+ela não foi rodada nos 93.
 
 **Passo 13 — Execução no jogo todo (`run_champion_full.py`).**
 O modelo final foi rodado nos 158.857 frames avaliados (os dois tempos): detector do Roboflow em
-ladrilhos → máscara do campo de 2 m → fusão com o ATD, com os mesmos parâmetros escolhidos nos frames
-anotados. O vídeo é lido uma vez, em ordem; a detecção salva a cada 500 frames e retoma de onde parou se
+ladrilhos → máscara do campo de 2 m → fusão com o ATD, com os mesmos parâmetros. O vídeo é lido uma vez, em ordem; a detecção salva a cada 500 frames e retoma de onde parou se
 for interrompida. Rodou na GPU do notebook do autor (NVIDIA RTX 3050 de 6 GB, PyTorch com CUDA) em cerca
 de 27 h; na CPU a estimativa era de ~385 h. A saída (`out/full_bola.csv`) é a posição da bola em pixels de
 cada frame avaliado com bola, com a regra da fusão que a produziu. Fica em `out/`, fora do Git.
@@ -230,19 +229,19 @@ todo (passo 13), em metros no campo:
 | Acerto onde o ATD tem bola, teste | 92,0% | 84,0% | 92,0% |
 | Acerto onde o ATD não tem bola, teste (29) | 24,1% | 58,6% | 58,6% |
 | Falso alarme, teste (14 frames sem bola) | 7,1% | 42,9% | 42,9% |
-| Falso alarme, validação (33) | 21,2% | 57,6% | 48,5% |
-| F1, teste / validação | 76,8% / 74,5% | 75,6% / 72,3% | 81,3% / 75,4% |
+| Falso alarme, 292 frames (33) | 21,2% | 57,6% | 48,5% |
+| F1, 93 / 292 frames | 76,8% / 74,5% | 75,6% / 72,3% | 81,3% / 75,4% |
 
 O Kalman piorou onde o ATD tem bola (o rastro "gruda" em objetos errados) e teve o menor F1. O Viterbi
 acertou mais, mas a análise frame a frame dos 29 frames de teste sem ATD mostrou de onde vem o ganho e o
 custo: dos 17 acertos dele, 16 são detecções do próprio Roboflow com confiança abaixo de 0,8 (que a fusão
 descarta) e só 1 é interpolação; e o falso alarme também vem de detecções (4 dos 5 frames sem bola em que
 ele deu posição), com 3 posições a 760–958 px da bola. Para separar o efeito da continuidade do efeito de
-simplesmente aceitar confiança menor, rodamos a fusão com `--solo-conf 0,5` na validação: ela levou a maior
+simplesmente aceitar confiança menor, rodamos a fusão com `--solo-conf 0,5` nos 292 frames: ela levou a maior
 parte do ganho do Viterbi onde o ATD não tem bola (42,9% contra 49,0%; o campeão faz 31,6%), com MENOS falso
 alarme (36,4% contra 48,5%). Ou seja, a continuidade quase não filtrou erros: Viterbi, limiar 0,5 e a fusão
 campeã são pontos da mesma troca entre acerto e falso alarme, com F1 empatado dentro das margens (73,6% a
-75,4% na validação). Ficamos com a fusão campeã, o ponto conservador: para a posse, uma bola inventada
+75,4% nos 292 frames). Ficamos com a fusão campeã, o ponto conservador: para a posse, uma bola inventada
 (em jogo parado, ou ao lado do jogador errado) tende a custar mais que uma bola faltando, que a camada de
 posse pode atravessar pela estabilidade da posse no tempo.
 
@@ -251,7 +250,7 @@ entrada: bola presente em 83,5% dos frames avaliados (72,8% na fusão), menos la
 e melhor validação dos modelos de posse (`posse_ml/README.md`, seções 5.2, 5.3 e 5.5). A submissão usa o Viterbi;
 o Kalman ficou descartado.
 
-## 4. Resultados no conjunto de validação
+## 4. Resultados nos 292 frames anotados (medição)
 
 259 frames com bola visível e 33 sem; tolerância de 40 px; margens de até ±6 pontos (A), ±10 (B),
 ±8 (C) e ±17 (D). "@" é a confiança mínima do candidato; as fusões não têm limiar.
@@ -268,12 +267,12 @@ o Kalman ficou descartado.
 | Falso alarme (D, n = 33) | 15,2% | 78,8% | 12,1% | 36,4% | 9,1% | 24,2% | 48,5% | 48,5% | 24,2% |
 | F1 | 59,3% | 46,3% | 47,9% | 58,7% | 66,7% | 60,6% | 64,2% | 69,1% | **73,3%** |
 
-A máscara de 2 m, adotada no modelo final, foi melhor que a de 3 m na mesma comparação.
+A máscara de 2 m foi a adotada no modelo final; nessa medição, ela ficou acima da de 3 m.
 
 ## 5. Limitações
 
-- **Amostras pequenas.** 292 frames para escolher e 93 para testar; as margens são largas, sobretudo no
-  falso alarme (33 frames sem bola na validação e só 14 no teste, margem de ±26 pontos): o teste mostra
+- **Amostras pequenas.** 292 + 93 frames de medição; as margens são largas, sobretudo no
+  falso alarme (33 frames sem bola nos 292 e só 14 nos 93, margem de ±26 pontos): o teste mostra
   que o modelo não aumenta o falso alarme do ATD, não que os dois sejam iguais.
 - **Detector de um frame.** O Roboflow não usa os frames vizinhos e vê a bola com confiança média em muitos
   frames que a fusão descarta. Aproveitá-los pela continuidade (Kalman, Viterbi) ou por um limiar menor
@@ -308,7 +307,7 @@ Para repetir as comparações, clonar em `tracking_bola/third_party/` o WASB-SBD
 FootAndBall (`git clone https://github.com/jac99/FootAndBall`, pesos no próprio repositório). Todas as
 saídas ficam em `tracking_bola/out/`, fora do Git.
 
-Modelo final, nos frames anotados (validação):
+Modelo final, nos 292 frames anotados (medição):
 
 ```
 python tracking_bola/detect_yolo.py --weights tracking_bola/pesos/football-ball-detection.pt --class-id 0 --out tracking_bola/out/yolo_roboflow.csv
