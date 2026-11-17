@@ -4,7 +4,7 @@ Colocar em tracking_bola/, junto de compare_trackers.py, eval_atd.py e check_pro
 opencv-python. Padrão: campeão (out/full_bola.csv) x Viterbi (out/viterbi_bola.csv) no conjunto de TESTE:
 
     python tracking_bola/compare_gaps.py
-    python tracking_bola/compare_gaps.py --annotations tracking_bola/out/annotations/ball_annotations.csv   # validação
+    python tracking_bola/compare_gaps.py --annotations tracking_bola/out/annotations/ball_annotations.csv   # os 292 frames
 
 Parte 1 - frames em que você VÊ a bola e o ATD não tem bola (o "n = 29" da seção B no teste). Para cada um:
 posição e erro de cada tracker, o resultado (acerto / longe / sem bola) e a regra que o Viterbi usou

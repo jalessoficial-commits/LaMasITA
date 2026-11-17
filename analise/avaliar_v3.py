@@ -16,8 +16,8 @@ Gabaritos (nenhum treina nada):
     manuais   analise/out/rotulos_manuais.csv: erro de início/fim e falso D nos 'viva'
     clipes    analise/out/rotulos_clipes.csv: vereditos do painel "Clipes D" do viewer
 
-Os rótulos à mão (blocos, manuais, clipes) só existem na máquina de quem rotulou e servem só para as
-métricas: sem eles as colunas correspondentes ficam vazias, e os D exportados saem iguais.
+Os rótulos à mão (blocos, manuais, clipes) só existem na máquina de quem rotulou e servem só para conferir
+que o detector funciona: sem eles as colunas correspondentes ficam vazias, e os D exportados saem iguais.
 """
 
 import argparse

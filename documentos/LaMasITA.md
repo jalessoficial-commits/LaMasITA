@@ -177,13 +177,15 @@ the pipeline does not read the broadcast files.
 **External.** Roboflow ball detector weights (public); Sportec Open DFL dataset (Bassek et al., 2025,
 CC-BY 4.0), the only training data of the possession network.
 
-Tried and dropped, with the number that decided it (possession rows: spellF1 on the public window):
+Tried and dropped. Possession rows: spellF1 on the public window, the number that decided it (Section 5).
+Ball and dead-ball rows: what we observed; the choice was made by hand in our viewer, and the hand-annotated
+figures were only a check (Section 6):
 
 | what | result | why dropped |
 |---|---|---|
 | YOLOv8 (COCO, `sports ball`), no training | did not beat the ATD | COCO has almost no small balls in open play |
 | FootAndBall, no training | ≈ 1% hit rate | barely responds to a ball this small |
-| WASB-SBDT fused with the ATD | F1 60.6% vs 73.3% (validation) | many far errors; Roboflow recovers twice as much where the ATD is blind |
+| WASB-SBDT fused with the ATD | F1 60.6% vs 73.3% (hand-annotated check) | many far errors; Roboflow recovers twice as much where the ATD is blind |
 | Kalman ball track | lowest F1; worse where the ATD has a ball | the track sticks to wrong objects |
 | CART and 2-state HMM for dead ball | CART relearned the weak-label rule; HMM stuck in D | uncalibrated probabilities |
 | Heuristic possession (`posse/`: nearest player, touch as a necessary condition) | 0.586 | predicts 11 possessions against 17; cannot tell a short possession from a touch the GT ignores |

@@ -97,7 +97,7 @@ class Config:
     pausa_vel: float = 1.5               # ... velocidade média no buraco < 1,5 m/s (VAR: 1,22)
     pausa_min_s: float = 30.0            # ... e um dos lados com >= 30 s
     inicio_de_tempo: bool = False        # D do começo do tempo até o Kick Off (Start)
-    # ---- v4 (vereditos dos clipes do 1º tempo, 2026-11-12) ---------------------------------------
+    # ---- v4 (parâmetros escolhidos à mão no viewer, 2026-11-12) -----------------------------------
     retro_apito_s: float = 0.0           # trecho v1 sem evento: recua o início até um apito forte descartado
     retro_sumico_s: float = 0.0          # ... ou até onde a bola sumiu com o jogo já lento (< retro_vel)
     retro_vel: float = 2.0

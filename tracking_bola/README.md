@@ -72,7 +72,7 @@ Modelos pré-treinados (todos públicos; o commit de cada repositório clonado f
 | YOLOv8m (COCO, `sports ball`) | `ultralytics` | AGPL-3.0 | `yolov8m.pt` | descartado |
 | FootAndBall | github.com/jac99/FootAndBall (Komorowski et al., VISAPP 2020) | MIT | `models/model_20201019_1416_final.pth` | descartado |
 
-**Conformidade.** As anotações à mão servem somente para medir o desempenho; não treinam nem escolhem
+**Conformidade.** As anotações à mão servem somente para conferir que o rastreador funciona; não treinam nem escolhem
 nada, e nada do que o sistema produz foi rotulado à mão. Os scripts processam o vídeo apenas na máquina local e não enviam dados a nenhum
 serviço externo (só baixam pesos públicos). Os arquivos derivados do vídeo (CSVs de posição por frame e
 recortes de imagem em `out/`) não são publicados: ficam no `.gitignore`, e este documento traz apenas
